@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vKomari</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+
+        .toggle-bg:after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+
+        input:checked+.toggle-bg:after {
+            transform: translateX(100%);
+        }
+
+        input:checked+.toggle-bg {
+            background-color: #10b981;
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #27272a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #52525b;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #71717a;
+        }
+    </style>
+</head>
+
+<body class="bg-zinc-900 text-zinc-100 min-h-screen font-sans" x-data="app()" x-cloak>
+
+    <!-- 登录页 -->
+    <div x-show="!token" class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-sm">
+            <h1 class="text-4xl font-bold text-emerald-400 text-center mb-2">vKomari</h1>
+            <p class="text-zinc-500 text-center mb-6 text-sm">虚拟探针集群管理系统</p>
+            <div class="bg-zinc-800 border border-zinc-700 rounded-xl p-6 shadow-xl">
+                <form @submit.prevent="login" class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">用户名</label>
+                        <input type="text" x-model="loginForm.username"
+                            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 focus:outline-none focus:border-emerald-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">密码</label>
+                        <input type="password" x-model="loginForm.password"
+                            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 focus:outline-none focus:border-emerald-500 transition">
+                    </div>
+                    <div x-show="loginError" class="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded"
+                        x-text="loginError"></div>
+                    <button type="submit"
+                        class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-semibold transition shadow-lg shadow-emerald-900/20">登
+                        录</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主界面 -->
+    <div x-show="token" class="min-h-screen">
+        <header class="bg-zinc-800/90 backdrop-blur border-b border-zinc-700 sticky top-0 z-30 px-4 py-3">
+            <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center text-emerald-400 font-bold">
+                        V</div>
+                    <h1 class="text-xl font-bold text-zinc-100">vKomari</h1>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button @click="batchAction('start')"
+                        class="px-3 py-1.5 text-xs bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded border border-emerald-600/20 transition">全部启动</button>
+                    <button @click="batchAction('stop')"
+                        class="px-3 py-1.5 text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded border border-red-600/20 transition">全部停止</button>
+                    <div class="w-px h-6 bg-zinc-700 mx-1"></div>
+                    <button @click="showPwdModal=true"
+                        class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">改密</button>
+                    <button @click="logout"
+                        class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">退出</button>
+                    <button @click="openModal()"
+                        class="px-4 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium shadow-lg shadow-emerald-900/20 transition flex items-center gap-1">
+                        <span class="text-lg leading-none">+</span> 添加节点
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto p-4 sm:p-6">
+            <!-- 统计卡片 -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-zinc-800 border border-zinc-700 rounded-xl p-4">
+                    <div class="text-zinc-500 text-xs uppercase tracking-wider">总节点</div>
+                    <div class="text-2xl font-bold mt-1" x-text="nodes.length">0</div>
+                </div>
+                <div class="bg-zinc-800 border border-zinc-700 rounded-xl p-4">
+                    <div class="text-zinc-500 text-xs uppercase tracking-wider">在线运行</div>
+                    <div class="text-2xl font-bold text-emerald-400 mt-1" x-text="nodes.filter(n=>n.online).length">0
+                    </div>
+                </div>
+                <div class="bg-zinc-800 border border-zinc-700 rounded-xl p-4">
+                    <div class="text-zinc-500 text-xs uppercase tracking-wider">启用状态</div>
+                    <div class="text-2xl font-bold text-blue-400 mt-1" x-text="nodes.filter(n=>n.enabled).length">0
+                    </div>
+                </div>
+                <div class="bg-zinc-800 border border-zinc-700 rounded-xl p-4">
+                    <div class="text-zinc-500 text-xs uppercase tracking-wider">高负载</div>
+                    <div class="text-2xl font-bold text-amber-400 mt-1"
+                        x-text="nodes.filter(n=>n.load_profile==='high').length">0</div>
+                </div>
+            </div>
+
+            <!-- 节点列表 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <template x-for="n in nodes" :key="n.id">
+                    <div
+                        class="bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden hover:border-zinc-600 transition group">
+                        <div class="p-4 border-b border-zinc-700/50 flex justify-between items-center bg-zinc-800/50">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="relative">
+                                    <div class="w-2.5 h-2.5 rounded-full"
+                                        :class="n.online?'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]':'bg-zinc-600'">
+                                    </div>
+                                    <div x-show="n.online"
+                                        class="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping opacity-75">
+                                    </div>
+                                </div>
+                                <div class="flex flex-col min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold truncate text-zinc-200" x-text="n.name"></span>
+                                        <span class="text-sm" x-text="getFlag(n.region)"></span>
+                                    </div>
+                                    <span class="text-xs text-zinc-500 truncate" x-text="n.server_address"></span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 shrink-0">
+                                <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded border" :class="{
+                                          'bg-emerald-500/10 text-emerald-400 border-emerald-500/20':n.load_profile==='low',
+                                          'bg-amber-500/10 text-amber-400 border-amber-500/20':n.load_profile==='mid',
+                                          'bg-red-500/10 text-red-400 border-red-500/20':n.load_profile==='high'
+                                      }" x-text="n.load_profile"></span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer" :checked="n.enabled"
+                                        @change="toggleNode(n.id,$event.target.checked)">
+                                    <div
+                                        class="toggle-bg w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full relative border border-zinc-600">
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="p-4 space-y-2 text-sm">
+                            <div class="flex justify-between items-center"><span class="text-zinc-500">配置</span><span
+                                    class="text-zinc-300 font-mono" x-text="n.cpu_cores+'C / '+n.ram_total+'MB'"></span>
+                            </div>
+                            <div class="flex justify-between items-center"><span class="text-zinc-500">系统</span><span
+                                    class="text-zinc-300 text-xs truncate max-w-[180px]" x-text="n.os"></span></div>
+                            <div class="flex justify-between items-center"><span class="text-zinc-500">内核</span><span
+                                    class="text-zinc-300 text-xs truncate max-w-[180px]"
+                                    x-text="n.kernel_version"></span></div>
+                            <div class="flex justify-between items-center pt-1 border-t border-zinc-700/50"><span
+                                    class="text-zinc-500">上报统计</span><span class="text-emerald-400 font-mono"
+                                    x-text="n.sendCount||0"></span></div>
+                        </div>
+                        <div class="px-4 py-3 border-t border-zinc-700/50 flex gap-2 bg-zinc-800/30">
+                            <button @click="editNode(n)"
+                                class="flex-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 py-1.5 rounded-lg text-xs font-medium transition">配置</button>
+                            <button @click="deleteNode(n.id)"
+                                class="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 py-1.5 rounded-lg text-xs font-medium transition">删除</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div x-show="nodes.length===0"
+                class="text-center py-20 text-zinc-500 bg-zinc-800/30 rounded-xl border border-zinc-700/50 border-dashed">
+                <p class="text-lg">暂无节点</p>
+                <p class="text-sm mt-2">点击右上角添加按钮创建一个新的虚拟节点</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div x-show="showModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+        style="display:none" x-transition.opacity>
+        <div
+            class="bg-zinc-800 border border-zinc-700 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+            <div class="p-5 border-b border-zinc-700 flex justify-between items-center sticky top-0 bg-zinc-800 z-10">
+                <h2 class="text-lg font-bold text-zinc-100" x-text="form.id?'编辑节点配置':'新建虚拟节点'"></h2>
+                <button @click="showModal=false"
+                    class="text-zinc-500 hover:text-zinc-300 transition p-1 hover:bg-zinc-700 rounded">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-6">
+                <!-- 基础信息 -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-medium text-emerald-400 uppercase tracking-wider">基础信息</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">节点名称</label>
+                            <input type="text" x-model="form.name"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-xs text-zinc-400 mb-1.5">地区 (搜索)</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2 text-lg" x-text="getFlag(form.region)"></span>
+                                <input type="text" x-model="countrySearch" @focus="showCountryList=true"
+                                    @input="showCountryList=true" @blur="setTimeout(()=>showCountryList=false,150)"
+                                    placeholder="搜索国家..."
+                                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg pl-10 pr-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                            </div>
+                            <div x-show="showCountryList"
+                                class="absolute z-20 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg max-h-60 overflow-y-auto shadow-xl">
+                                <template x-for="c in filteredCountries" :key="c.code">
+                                    <div @mousedown.prevent="form.region=c.code;countrySearch=c.name;showCountryList=false"
+                                        class="px-3 py-2 hover:bg-zinc-700 cursor-pointer text-sm flex items-center gap-2 transition">
+                                        <span class="text-lg" x-text="c.flag"></span>
+                                        <span class="text-zinc-300" x-text="c.name"></span>
+                                        <span class="text-zinc-500 text-xs ml-auto" x-text="c.code"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">探针地址 (WebSocket/HTTP)</label>
+                            <input type="text" x-model="form.server_address" placeholder="例如: komari.example.com"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">密钥 (Secret)</label>
+                            <input type="text" x-model="form.client_secret"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition font-mono">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w-full h-px bg-zinc-700/50"></div>
+
+                <!-- 系统配置 -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-medium text-emerald-400 uppercase tracking-wider">系统环境</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">操作系统</label>
+                            <select x-model="form.os" @change="onOsChange()"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                                <option value="Debian GNU/Linux 12 (bookworm)">Debian 12</option>
+                                <option value="Debian GNU/Linux 11 (bullseye)">Debian 11</option>
+                                <option value="Ubuntu 24.04 LTS">Ubuntu 24.04 LTS</option>
+                                <option value="Ubuntu 22.04 LTS">Ubuntu 22.04 LTS</option>
+                                <option value="Ubuntu 20.04 LTS">Ubuntu 20.04 LTS</option>
+                                <option value="CentOS Stream 9">CentOS Stream 9</option>
+                                <option value="Rocky Linux 9">Rocky Linux 9</option>
+                                <option value="AlmaLinux 9">AlmaLinux 9</option>
+                                <option value="Fedora 40">Fedora 40</option>
+                                <option value="Arch Linux">Arch Linux</option>
+                                <option value="Alpine Linux 3.20">Alpine Linux 3.20</option>
+                                <option value="openSUSE Leap 15.6">openSUSE Leap 15.6</option>
+                                <option value="Windows Server 2022">Windows Server 2022</option>
+                                <option value="Windows 11">Windows 11</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">内核版本</label>
+                            <select x-model="form.kernel_version"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition font-mono">
+                                <template x-for="k in getKernelsForOs(form.os)" :key="k">
+                                    <option :value="k" x-text="k"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">架构</label>
+                            <select x-model="form.arch"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                                <option value="amd64">amd64 (x86_64)</option>
+                                <option value="aarch64">aarch64 (ARM64)</option>
+                                <option value="i386">i386 (x86)</option>
+                                <option value="armv7l">armv7l (ARM32)</option>
+                                <option value="riscv64">riscv64</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">虚拟化技术</label>
+                            <select x-model="form.virtualization"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                                <option value="kvm">KVM</option>
+                                <option value="vmware">VMware</option>
+                                <option value="hyperv">Hyper-V</option>
+                                <option value="xen">Xen</option>
+                                <option value="lxc">LXC</option>
+                                <option value="openvz">OpenVZ</option>
+                                <option value="docker">Docker</option>
+                                <option value="none">物理机 (None)</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs text-zinc-400 mb-1.5">CPU 型号</label>
+                            <select x-model="form.cpu_model"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                                <option value="Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz">Intel Xeon E5-2690 v4</option>
+                                <option value="Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz">Intel Xeon Platinum
+                                    8259CL</option>
+                                <option value="Intel(R) Xeon(R) Gold 6133 CPU @ 2.50GHz">Intel Xeon Gold 6133</option>
+                                <option value="AMD EPYC 7763 64-Core Processor">AMD EPYC 7763</option>
+                                <option value="AMD EPYC 7B12 64-Core Processor">AMD EPYC 7B12</option>
+                                <option value="AMD Ryzen 9 5950X 16-Core Processor">AMD Ryzen 9 5950X</option>
+                                <option value="Intel(R) Core(TM) i9-13900K">Intel Core i9-13900K</option>
+                                <option value="Ampere Altra Q80-30">Ampere Altra Q80 (ARM)</option>
+                                <option value="Apple M2 Pro">Apple M2 Pro</option>
+                                <option value="QEMU Virtual CPU version 2.5+">QEMU Virtual CPU</option>
+                                <option value="Common KVM processor">KVM Processor</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs text-zinc-400 mb-1.5">启动时间 (留空为当前)</label>
+                            <input type="date" x-model="form.boot_time_date"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition text-zinc-300">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w-full h-px bg-zinc-700/50"></div>
+
+                <!-- 硬件规格 -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-medium text-emerald-400 uppercase tracking-wider">硬件规格</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div><label class="block text-xs text-zinc-400 mb-1.5">CPU 核心数</label><input type="number"
+                                x-model.number="form.cpu_cores"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">内存</label>
+                            <div class="flex">
+                                <input type="number" x-model.number="form.ram_total"
+                                    class="w-full bg-zinc-900 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition border-r-0">
+                                <button @click="form.ram_unit = form.ram_unit === 'MB' ? 'GB' : 'MB'"
+                                    class="bg-zinc-800 border-y border-r border-zinc-700 px-2 text-xs rounded-r-lg hover:bg-zinc-700 transition"
+                                    x-text="form.ram_unit"></button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">Swap</label>
+                            <div class="flex">
+                                <input type="number" x-model.number="form.swap_total"
+                                    class="w-full bg-zinc-900 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition border-r-0">
+                                <button @click="form.swap_unit = form.swap_unit === 'MB' ? 'GB' : 'MB'"
+                                    class="bg-zinc-800 border-y border-r border-zinc-700 px-2 text-xs rounded-r-lg hover:bg-zinc-700 transition"
+                                    x-text="form.swap_unit"></button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">硬盘</label>
+                            <div class="flex">
+                                <input type="number" x-model.number="form.disk_total"
+                                    class="w-full bg-zinc-900 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition border-r-0">
+                                <button @click="form.disk_unit = form.disk_unit === 'MB' ? 'GB' : 'MB'"
+                                    class="bg-zinc-800 border-y border-r border-zinc-700 px-2 text-xs rounded-r-lg hover:bg-zinc-700 transition"
+                                    x-text="form.disk_unit"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w-full h-px bg-zinc-700/50"></div>
+
+                <!-- 负载模拟 -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-medium text-emerald-400 uppercase tracking-wider">负载模拟配置</h3>
+                        <div class="flex gap-2">
+                            <label class="text-xs text-zinc-400 self-center">快速预设:</label>
+                            <select x-model="form.load_profile" @change="applyPreset"
+                                class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs focus:border-emerald-500 focus:outline-none transition">
+                                <option value="low">🟢 低负载 (闲置)</option>
+                                <option value="mid">🟡 中负载 (正常)</option>
+                                <option value="high">🔴 高负载 (繁忙)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-zinc-900/50 border border-zinc-700/50 rounded-xl p-4 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <!-- CPU -->
+                            <div class="space-y-1">
+                                <div class="flex justify-between"><label class="text-xs text-zinc-400">CPU 使用率
+                                        (%)</label><span class="text-xs text-zinc-500">Min - Max</span></div>
+                                <div class="flex gap-2 items-center">
+                                    <input type="number" x-model.number="form.cpu_min"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                    <span class="text-zinc-600">-</span>
+                                    <input type="number" x-model.number="form.cpu_max"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                </div>
+                            </div>
+                            <!-- 内存 -->
+                            <div class="space-y-1">
+                                <div class="flex justify-between"><label class="text-xs text-zinc-400">内存 使用率
+                                        (%)</label><span class="text-xs text-zinc-500">Min - Max</span></div>
+                                <div class="flex gap-2 items-center">
+                                    <input type="number" x-model.number="form.mem_min"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                    <span class="text-zinc-600">-</span>
+                                    <input type="number" x-model.number="form.mem_max"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                </div>
+                            </div>
+                            <!-- Swap -->
+                            <div class="space-y-1">
+                                <div class="flex justify-between"><label class="text-xs text-zinc-400">Swap 使用率
+                                        (%)</label><span class="text-xs text-zinc-500">Min - Max</span></div>
+                                <div class="flex gap-2 items-center">
+                                    <input type="number" x-model.number="form.swap_min"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                    <span class="text-zinc-600">-</span>
+                                    <input type="number" x-model.number="form.swap_max"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                </div>
+                            </div>
+                            <!-- 硬盘 -->
+                            <div class="space-y-1">
+                                <div class="flex justify-between"><label class="text-xs text-zinc-400">硬盘 使用率
+                                        (%)</label><span class="text-xs text-zinc-500">Min - Max</span></div>
+                                <div class="flex gap-2 items-center">
+                                    <input type="number" x-model.number="form.disk_min"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                    <span class="text-zinc-600">-</span>
+                                    <input type="number" x-model.number="form.disk_max"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                </div>
+                            </div>
+                            <!-- 网速 -->
+                            <div class="space-y-1">
+                                <div class="flex justify-between items-center">
+                                    <label class="text-xs text-zinc-400">实时网速</label>
+                                    <div class="flex items-center gap-2">
+                                        <button @click="toggleNetUnit()"
+                                            class="text-[10px] bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-zinc-400 hover:text-white transition"
+                                            x-text="form.net_unit"></button>
+                                        <span class="text-xs text-zinc-500">Min - Max</span>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2 items-center">
+                                    <input type="number" x-model.number="form.net_min"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                    <span class="text-zinc-600">-</span>
+                                    <input type="number" x-model.number="form.net_max"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                </div>
+                            </div>
+                            <!-- 上报间隔 -->
+                            <div class="space-y-1">
+                                <label class="block text-xs text-zinc-400 mb-1.5">上报间隔 (秒)</label>
+                                <input type="number" x-model.number="form.report_interval" min="1" max="60"
+                                    class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                            </div>
+                            <!-- 连接数 -->
+                            <div class="space-y-1">
+                                <div class="flex justify-between"><label class="text-xs text-zinc-400">TCP
+                                        连接数</label><span class="text-xs text-zinc-500">Min - Max</span></div>
+                                <div class="flex gap-2 items-center">
+                                    <input type="number" x-model.number="form.conn_min"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                    <span class="text-zinc-600">-</span>
+                                    <input type="number" x-model.number="form.conn_max"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                </div>
+                            </div>
+                            <!-- 进程数 -->
+                            <div class="space-y-1">
+                                <div class="flex justify-between"><label class="text-xs text-zinc-400">进程数量</label><span
+                                        class="text-xs text-zinc-500">Min - Max</span></div>
+                                <div class="flex gap-2 items-center">
+                                    <input type="number" x-model.number="form.proc_min"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                    <span class="text-zinc-600">-</span>
+                                    <input type="number" x-model.number="form.proc_max"
+                                        class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-center">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="p-5 border-t border-zinc-700 flex justify-end gap-3 sticky bottom-0 bg-zinc-800 z-10 rounded-b-xl">
+                <button @click="showModal=false"
+                    class="px-5 py-2.5 text-zinc-400 hover:text-zinc-200 transition">取消</button>
+                <button @click="saveNode"
+                    class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium shadow-lg shadow-emerald-900/20 transition">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 改密弹窗 -->
+    <div x-show="showPwdModal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+        style="display:none" x-transition.opacity>
+        <div class="bg-zinc-800 border border-zinc-700 rounded-xl w-full max-w-sm p-6 shadow-2xl">
+            <h2 class="text-lg font-bold text-amber-400 mb-4">修改管理员密码</h2>
+            <div class="space-y-4">
+                <input type="password" x-model="newPassword" @keyup.enter="changePassword" placeholder="输入新密码 (至少6位)"
+                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 focus:border-amber-500 focus:outline-none transition">
+                <div class="flex gap-3 pt-2">
+                    <button x-show="!isDefaultPwd" @click="showPwdModal=false"
+                        class="flex-1 text-zinc-500 hover:text-zinc-300 transition">取消</button>
+                    <button @click="changePassword"
+                        class="flex-1 bg-amber-600 hover:bg-amber-500 text-white py-2.5 rounded-lg font-semibold transition shadow-lg shadow-amber-900/20">确认修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // OS到内核版本映射
+        const KERNEL_MAP = {
+            'Debian GNU/Linux 12 (bookworm)': ['6.1.0-18-amd64', '6.1.0-25-amd64', '6.1.0-28-amd64'],
+            'Debian GNU/Linux 11 (bullseye)': ['5.10.0-28-amd64', '5.10.0-30-amd64'],
+            'Ubuntu 24.04 LTS': ['6.8.0-31-generic', '6.8.0-40-generic', '6.8.0-45-generic'],
+            'Ubuntu 22.04 LTS': ['6.5.0-44-generic', '5.15.0-91-generic', '5.15.0-100-generic'],
+            'Ubuntu 20.04 LTS': ['5.15.0-91-generic', '5.4.0-150-generic', '5.4.0-170-generic'],
+            'CentOS Stream 9': ['5.14.0-362.8.1.el9_3', '5.14.0-427.el9', '5.14.0-503.el9'],
+            'Rocky Linux 9': ['5.14.0-362.8.1.el9_3', '5.14.0-427.el9'],
+            'AlmaLinux 9': ['5.14.0-362.8.1.el9_3', '5.14.0-427.el9'],
+            'Fedora 40': ['6.8.5-301.fc40', '6.9.4-200.fc40'],
+            'Arch Linux': ['6.6.30-2-lts', '6.7.9-arch1-1', '6.8.1-arch1-1'],
+            'Alpine Linux 3.20': ['6.6.32-0-lts', '6.6.35-0-lts'],
+            'openSUSE Leap 15.6': ['5.14.21-150500.55.73', '6.4.0-150600.21'],
+            'Windows Server 2022': ['10.0.20348', '10.0.25398'],
+            'Windows 11': ['10.0.22621', '10.0.22631', '10.0.26100']
+        };
+
+        // 完整国家代码列表
+        const COUNTRIES = [
+            { code: 'CN', name: '中国', flag: '🇨🇳' }, { code: 'HK', name: '香港', flag: '🇭🇰' }, { code: 'TW', name: '台湾', flag: '🇹🇼' }, { code: 'MO', name: '澳门', flag: '🇲🇴' },
+            { code: 'US', name: '美国', flag: '🇺🇸' }, { code: 'JP', name: '日本', flag: '🇯🇵' }, { code: 'KR', name: '韩国', flag: '🇰🇷' }, { code: 'SG', name: '新加坡', flag: '🇸🇬' },
+            { code: 'GB', name: '英国', flag: '🇬🇧' }, { code: 'DE', name: '德国', flag: '🇩🇪' }, { code: 'FR', name: '法国', flag: '🇫🇷' }, { code: 'NL', name: '荷兰', flag: '🇳🇱' },
+            { code: 'RU', name: '俄罗斯', flag: '🇷🇺' }, { code: 'CA', name: '加拿大', flag: '🇨🇦' }, { code: 'AU', name: '澳大利亚', flag: '🇦🇺' }, { code: 'IN', name: '印度', flag: '🇮🇳' },
+            { code: 'TH', name: '泰国', flag: '🇹🇭' }, { code: 'VN', name: '越南', flag: '🇻🇳' }, { code: 'MY', name: '马来西亚', flag: '🇲🇾' }, { code: 'ID', name: '印尼', flag: '🇮🇩' },
+            { code: 'PH', name: '菲律宾', flag: '🇵🇭' }, { code: 'BR', name: '巴西', flag: '🇧🇷' }, { code: 'AR', name: '阿根廷', flag: '🇦🇷' }, { code: 'MX', name: '墨西哥', flag: '🇲🇽' },
+            { code: 'ZA', name: '南非', flag: '🇿🇦' }, { code: 'EG', name: '埃及', flag: '🇪🇬' }, { code: 'TR', name: '土耳其', flag: '🇹🇷' }, { code: 'SA', name: '沙特', flag: '🇸🇦' },
+            { code: 'AE', name: '阿联酋', flag: '🇦🇪' }, { code: 'IL', name: '以色列', flag: '🇮🇱' }, { code: 'IT', name: '意大利', flag: '🇮🇹' }, { code: 'ES', name: '西班牙', flag: '🇪🇸' },
+            { code: 'PT', name: '葡萄牙', flag: '🇵🇹' }, { code: 'PL', name: '波兰', flag: '🇵🇱' }, { code: 'SE', name: '瑞典', flag: '🇸🇪' }, { code: 'NO', name: '挪威', flag: '🇳🇴' },
+            { code: 'FI', name: '芬兰', flag: '🇫🇮' }, { code: 'DK', name: '丹麦', flag: '🇩🇰' }, { code: 'CH', name: '瑞士', flag: '🇨🇭' }, { code: 'AT', name: '奥地利', flag: '🇦🇹' },
+            { code: 'BE', name: '比利时', flag: '🇧🇪' }, { code: 'IE', name: '爱尔兰', flag: '🇮🇪' }, { code: 'CZ', name: '捷克', flag: '🇨🇿' }, { code: 'RO', name: '罗马尼亚', flag: '🇷🇴' },
+            { code: 'HU', name: '匈牙利', flag: '🇭🇺' }, { code: 'GR', name: '希腊', flag: '🇬🇷' }, { code: 'UA', name: '乌克兰', flag: '🇺🇦' }, { code: 'KZ', name: '哈萨克斯坦', flag: '🇰🇿' },
+            { code: 'NZ', name: '新西兰', flag: '🇳🇿' }, { code: 'CL', name: '智利', flag: '🇨🇱' }, { code: 'CO', name: '哥伦比亚', flag: '🇨🇴' }, { code: 'PE', name: '哥伦比亚', flag: '🇵🇪' },
+            { code: 'PK', name: '巴基斯坦', flag: '🇵🇰' }, { code: 'BD', name: '孟加拉', flag: '🇧🇩' }, { code: 'NG', name: '尼日利亚', flag: '🇳🇬' }, { code: 'KE', name: '肯尼亚', flag: '🇰🇪' }
+        ].sort((a, b) => a.code.localeCompare(b.code));
+
+        function app() {
+            return {
+                token: localStorage.getItem('vkomari_token') || '',
+                loginForm: { username: 'admin', password: '' },
+                loginError: '',
+                nodes: [],
+                showModal: false,
+                showPwdModal: false,
+                isDefaultPwd: false,
+                newPassword: '',
+                form: {},
+                presets: {},
+                countrySearch: '',
+                showCountryList: false,
+
+                get filteredCountries() {
+                    const s = this.countrySearch.toLowerCase();
+                    return COUNTRIES.filter(c => c.code.toLowerCase().includes(s) || c.name.toLowerCase().includes(s));
+                },
+
+                getFlag(code) {
+                    const c = COUNTRIES.find(x => x.code === code);
+                    return c ? c.flag : '🏳️';
+                },
+
+                getKernelsForOs(os) {
+                    return KERNEL_MAP[os] || ['6.1.0-18-amd64'];
+                },
+
+                onOsChange() {
+                    const kernels = this.getKernelsForOs(this.form.os);
+                    if (kernels.length > 0 && !kernels.includes(this.form.kernel_version)) {
+                        this.form.kernel_version = kernels[0];
+                    }
+                },
+
+                init() {
+                    if (this.token) {
+                        // 验证 Token 有效性
+                        fetch('/api/nodes', { headers: { 'Authorization': 'Bearer ' + this.token } })
+                            .then(r => {
+                                if (r.status === 401 || r.status === 403) this.logout();
+                                else {
+                                    r.json().then(d => this.nodes = d);
+                                    this.start();
+                                }
+                            })
+                            .catch(() => this.logout());
+                    }
+                    fetch('/api/presets').then(r => r.json()).then(d => this.presets = d).catch(() => { });
+                },
+
+                async login() {
+                    try {
+                        const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.loginForm) });
+                        const d = await r.json();
+                        if (r.ok) {
+                            this.token = d.token;
+                            localStorage.setItem('vkomari_token', d.token);
+                            this.loginError = '';
+                            if (d.isDefault) { this.isDefaultPwd = true; this.showPwdModal = true; }
+                            this.start();
+                        } else this.loginError = d.error;
+                    } catch (e) { this.loginError = '连接失败'; }
+                },
+
+                logout() { this.token = ''; localStorage.removeItem('vkomari_token'); this.nodes = []; },
+
+                async changePassword() {
+                    if (this.newPassword.length < 6) return alert('密码至少6位');
+                    const r = await this.api('/api/change-password', 'POST', { newPassword: this.newPassword });
+                    if (r && r.success) { alert('修改成功'); this.showPwdModal = false; }
+                },
+
+                async api(url, method = 'GET', body = null) {
+                    const opts = { method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token } };
+                    if (body) opts.body = JSON.stringify(body);
+                    try {
+                        const r = await fetch(url, opts);
+                        if (r.status === 401 || r.status === 403) { this.logout(); return null; }
+                        return await r.json();
+                    } catch (e) { return null; }
+                },
+
+                start() { this.loadNodes(); setInterval(() => this.loadNodes(), 3000); },
+
+                async loadNodes() { if (this.token) { const d = await this.api('/api/nodes'); if (d) this.nodes = d; } },
+
+                openModal() {
+                    const p = this.presets.low || {};
+                    this.form = {
+                        name: 'Node-' + (this.nodes.length + 1), server_address: '', client_secret: '',
+                        cpu_model: 'Intel Xeon E5-2690 v4', cpu_cores: 2, ram_total: 2048, swap_total: 512, disk_total: 20480,
+                        os: 'Debian GNU/Linux 12 (bookworm)', arch: 'amd64', virtualization: 'kvm', region: 'CN',
+                        kernel_version: '6.1.0-18-amd64', load_profile: 'low', report_interval: 1, enabled: 1,
+                        // 单位控制
+                        ram_unit: 'MB', swap_unit: 'MB', disk_unit: 'MB', net_unit: 'Bytes',
+                        // 启动时间
+                        boot_time: 0, boot_time_date: '',
+                        // 填充预设值
+                        cpu_min: p.cpu_min, cpu_max: p.cpu_max, mem_min: p.mem_min, mem_max: p.mem_max,
+                        swap_min: p.swap_min, swap_max: p.swap_max, disk_min: p.disk_min, disk_max: p.disk_max,
+                        net_min: p.net_min, net_max: p.net_max, conn_min: p.conn_min, conn_max: p.conn_max,
+                        proc_min: p.proc_min, proc_max: p.proc_max
+                    };
+                    this.countrySearch = '中国';
+                    this.showModal = true;
+                },
+
+                editNode(n) {
+                    this.form = { ...n };
+                    // 初始化硬件单位
+                    this.form.ram_unit = 'MB'; this.form.swap_unit = 'MB'; this.form.disk_unit = 'MB';
+                    if (this.form.ram_total >= 1024 && this.form.ram_total % 1024 === 0) { this.form.ram_total /= 1024; this.form.ram_unit = 'GB'; }
+                    if (this.form.swap_total >= 1024 && this.form.swap_total % 1024 === 0) { this.form.swap_total /= 1024; this.form.swap_unit = 'GB'; }
+                    if (this.form.disk_total >= 1024 && this.form.disk_total % 1024 === 0) { this.form.disk_total /= 1024; this.form.disk_unit = 'GB'; }
+
+                    // 初始化网速单位
+                    this.form.net_unit = 'Bytes';
+                    if (this.form.net_min >= 1048576) {
+                        this.form.net_min /= 1048576; this.form.net_max /= 1048576; this.form.net_unit = 'MB';
+                    } else if (this.form.net_min >= 1024) {
+                        this.form.net_min /= 1024; this.form.net_max /= 1024; this.form.net_unit = 'KB';
+                    }
+
+                    // 初始化日期
+                    if (n.boot_time > 0) {
+                        const date = new Date(n.boot_time * 1000);
+                        this.form.boot_time_date = date.toISOString().slice(0, 10);
+                    } else {
+                        this.form.boot_time_date = '';
+                    }
+
+                    const c = COUNTRIES.find(x => x.code === n.region);
+                    this.countrySearch = c ? c.name : n.region;
+                    this.showModal = true;
+                },
+
+                applyPreset() {
+                    const p = this.presets[this.form.load_profile];
+                    if (p) {
+                        const keys = ['cpu_min', 'cpu_max', 'mem_min', 'mem_max', 'swap_min', 'swap_max', 'disk_min', 'disk_max', 'conn_min', 'conn_max', 'proc_min', 'proc_max'];
+                        keys.forEach(k => this.form[k] = p[k]);
+
+                        // 网速单独处理
+                        let min = p.net_min, max = p.net_max;
+                        if (this.form.net_unit === 'KB') { min /= 1024; max /= 1024; }
+                        else if (this.form.net_unit === 'MB') { min /= 1048576; max /= 1048576; }
+                        this.form.net_min = min; this.form.net_max = max;
+                    }
+                },
+
+                toggleNetUnit() {
+                    const u = this.form.net_unit;
+                    let next = u === 'Bytes' ? 'KB' : (u === 'KB' ? 'MB' : 'Bytes');
+
+                    // 转换数值
+                    if (u === 'Bytes' && next === 'KB') { this.form.net_min /= 1024; this.form.net_max /= 1024; }
+                    else if (u === 'KB' && next === 'MB') { this.form.net_min /= 1024; this.form.net_max /= 1024; }
+                    else if (u === 'MB' && next === 'Bytes') { this.form.net_min *= 1048576; this.form.net_max *= 1048576; }
+                    else if (u === 'KB' && next === 'Bytes') { this.form.net_min *= 1024; this.form.net_max *= 1024; }
+
+                    this.form.net_unit = next;
+                },
+
+                async saveNode() {
+                    if (!this.form.name || !this.form.server_address) return alert('请填写名称和地址');
+                    this.form.server_address = this.form.server_address.replace(/\/+$/, ''); // 去除尾部斜杠
+
+                    // 克隆表单对象以避免修改显示值
+                    let payload = { ...this.form };
+
+                    // 单位转换回 MB
+                    if (this.form.ram_unit === 'GB') payload.ram_total *= 1024;
+                    if (this.form.swap_unit === 'GB') payload.swap_total *= 1024;
+                    if (this.form.disk_unit === 'GB') payload.disk_total *= 1024;
+
+                    // 网速单位转换回 Bytes
+                    if (this.form.net_unit === 'KB') { payload.net_min *= 1024; payload.net_max *= 1024; }
+                    else if (this.form.net_unit === 'MB') { payload.net_min *= 1048576; payload.net_max *= 1048576; }
+
+                    // 处理启动时间日期
+                    if (this.form.boot_time_date) {
+                        payload.boot_time = Math.floor(new Date(this.form.boot_time_date).getTime() / 1000);
+                    }
+
+                    await this.api('/api/nodes', 'POST', payload);
+                    this.showModal = false;
+                    this.loadNodes();
+                },
+
+                async toggleNode(id, enabled) { await this.api('/api/toggle', 'POST', { id, enabled }); this.loadNodes(); },
+
+                async batchAction(action) {
+                    if (!confirm(action === 'start' ? '启动全部?' : '停止全部?')) return;
+                    await this.api('/api/batch', 'POST', { action });
+                    this.loadNodes();
+                },
+
+                async deleteNode(id) {
+                    if (!confirm('确定删除?')) return;
+                    await this.api('/api/delete', 'POST', { id });
+                    this.loadNodes();
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
