@@ -1,0 +1,18 @@
+services:
+  vkomari:
+    build: .
+    container_name: vkomari
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DB_PATH=/app/data/database.sqlite
+      - JWT_SECRET=vkomari_secret_change_me_please
+    # 资源限制 (防止模拟节点过多撑爆宿主机)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
