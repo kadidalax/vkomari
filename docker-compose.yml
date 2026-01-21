@@ -1,6 +1,6 @@
 services:
   vkomari:
-    build: .
+    image: ghcr.io/kadidalax/vkomari:latest
     container_name: vkomari
     restart: unless-stopped
     ports:
@@ -8,11 +8,11 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - DB_PATH=/app/data/database.sqlite
-      - JWT_SECRET=vkomari_secret_change_me_please
-    # 资源限制 (防止模拟节点过多撑爆宿主机)
+      - DB_PATH=/app/data/vkomari.db
+      - JWT_SECRET=change-me-to-something-very-random
+    # 如果是小内存 VPS，可以保留这些限制
     deploy:
       resources:
         limits:
-          cpus: '0.50'
-          memory: 512M
+          memory: 256M
+          cpus: '0.5'
