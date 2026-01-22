@@ -68,6 +68,14 @@ function generateFakeIP(region) {
     return prefix + third + '.' + fourth;
 }
 
+// ISO 国家代码转 emoji 旗帜
+function isoToEmoji(code) {
+    if (!code || code.length !== 2) return '🏳️';
+    return String.fromCodePoint(
+        ...code.toUpperCase().split('').map(function(c) { return 0x1F1E6 + c.charCodeAt(0) - 65; })
+    );
+}
+
 var PORT = 4000;
 var DB_PATH = process.env.DB_PATH || nodePath.join(__dirname, 'data', 'database.sqlite');
 var JWT_SECRET = process.env.JWT_SECRET || 'vkomari-secret-key-2026';
@@ -206,6 +214,7 @@ Agent.prototype.stop = function () {
 };
 
 Agent.prototype.update = function (newConfig) {
+    var wasEnabled = !!this.config.enabled;
     var needsRestart = this.config.server_address !== newConfig.server_address || this.config.client_secret !== newConfig.client_secret;
     this.config = newConfig;
 
@@ -233,7 +242,7 @@ Agent.prototype.connect = function () {
     console.log('[vKomari] Connecting: ' + this.config.name);
     try {
         this.ws = new WebSocket(wsUrl, {
-            headers: { 'User-Agent': 'komari-agent/1.1.40', 'Origin': httpUrl },
+            headers: { 'User-Agent': 'komari-agent/0.1.0', 'Origin': httpUrl },
             handshakeTimeout: 10000, rejectUnauthorized: false
         });
         this.ws.on('open', function () {
@@ -259,33 +268,59 @@ Agent.prototype.uploadInfo = function (baseUrl) {
         cpu_name: c.cpu_model || 'Intel Xeon',
         virtualization: c.virtualization || 'kvm',
         arch: c.arch || 'amd64',
-        cpu_cores: c.cpu_cores || 2,
+        cpu_cores: parseInt(c.cpu_cores) || 2,
         os: c.os || 'Linux',
-        kernel: c.kernel_version || '6.1.0-18-amd64',
-        gpu_name: 'None',
+        gpu_name: '',
         ipv4: c.fake_ip || '127.0.0.1',
-        region: c.region || 'CN',
-        mem_total: (c.ram_total || 1024) * 1048576,
-        swap_total: (c.swap_total || 0) * 1048576,
-        disk_total: (c.disk_total || 10240) * 1048576,
-        version: '1.1.40'
+        region: isoToEmoji(c.region) || '🇨🇳',
+        mem_total: Math.floor((parseInt(c.ram_total) || 1024) * 1048576),
+        swap_total: Math.floor((parseInt(c.swap_total) || 0) * 1048576),
+        disk_total: Math.floor((parseInt(c.disk_total) || 10240) * 1048576),
+        version: '0.20.5'
     };
+
+    var self = this;
+    var path = '/api/clients/uploadBasicInfo';
+    
     try {
-        var url = new URL(baseUrl + '/api/clients/uploadBasicInfo?token=' + encodeURIComponent(c.client_secret));
+        var url = new URL(baseUrl + path + '?token=' + encodeURIComponent(c.client_secret));
+        var postData = JSON.stringify(info);
         var req = (url.protocol === 'https:' ? https : http).request({
-            hostname: url.hostname, port: url.port, path: url.pathname + url.search,
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, rejectUnauthorized: false
-        }, function (res) { res.resume(); });
-        req.on('error', function () { });
-        req.write(JSON.stringify(info));
+            hostname: url.hostname, port: url.port || (url.protocol === 'https:' ? 443 : 80),
+            path: url.pathname + url.search,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Content-Length': Buffer.byteLength(postData),
+                'User-Agent': 'komari-agent/0.1.0'
+            },
+            rejectUnauthorized: false
+        }, function (res) {
+            var body = '';
+            res.on('data', function(chunk) { body += chunk; });
+            res.on('end', function() {
+                if (res.statusCode === 200 && body.indexOf('success') !== -1) {
+                    console.log('[vKomari] ✓ Basic info uploaded: ' + self.config.name);
+                } else {
+                    console.log('[vKomari] ! Basic info (' + res.statusCode + '): ' + self.config.name + ' - ' + body.substring(0, 100));
+                }
+            });
+        });
+        req.on('error', function (err) {
+            console.log('[vKomari] ! Basic info error: ' + self.config.name + ' - ' + err.message);
+        });
+        req.write(postData);
         req.end();
-    } catch (e) { }
+    } catch (e) {
+        console.log('[vKomari] ! Basic info exception: ' + e.message);
+    }
 };
 
 Agent.prototype.startLoops = function (httpUrl) {
     var self = this;
     clearInterval(this.timers.heartbeat); clearInterval(this.timers.info);
-    var iv = Math.max(1000, (this.config.report_interval || 1) * 1000);
+    var iv = Math.max(1000, Math.min(10000, (this.config.report_interval || 1) * 1000));
     this.sendData();
     this.timers.heartbeat = setInterval(function () { if (self.ws && self.ws.readyState === WebSocket.OPEN) self.sendData(); }, iv);
     this.timers.info = setInterval(function () { if (self.state.connected) self.uploadInfo(httpUrl); }, 300000);
@@ -294,30 +329,11 @@ Agent.prototype.startLoops = function (httpUrl) {
 Agent.prototype.sendData = function () {
     var c = this.config;
 
-    // 确保配置值有效
-    var cpu_min = Number(c.cpu_min) || 0.5;
-    var cpu_max = Number(c.cpu_max) || 5.0;
-    var mem_min = Number(c.mem_min) || 5.0;
-    var mem_max = Number(c.mem_max) || 15.0;
-    var swap_min = Number(c.swap_min) || 0;
-    var swap_max = Number(c.swap_max) || 1.0;
-    var disk_min = Number(c.disk_min) || 10.0;
-    var disk_max = Number(c.disk_max) || 10.5;
-
-    var cpu_min = Number(c.cpu_min) || 0.5;
-    var cpu_max = Number(c.cpu_max) || 5.0;
-
-    // CPU 波动设计 (脉冲式)
-    var baseCpu = this.randFloat(cpu_min, cpu_min + (cpu_max - cpu_min) * 0.3);
-    if (Math.random() < 0.25) { // 25% 概率产生尖峰
-        baseCpu = this.randFloat(cpu_min + (cpu_max - cpu_min) * 0.5, cpu_max);
-    }
-    this.sim.cpu = baseCpu;
-
-    // 其他资源使用平滑波动
-    this.sim.mem = this.fluctuate(this.sim.mem, mem_min, mem_max, 0.2);
-    this.sim.swap = this.fluctuate(this.sim.swap, swap_min, swap_max, 0.1);
-    this.sim.disk = this.fluctuate(this.sim.disk, disk_min, disk_max, 0.05);
+    // 确定当前资源使用百分比
+    this.sim.cpu = this.fluctuate(this.sim.cpu, Number(c.cpu_min) || 0, Number(c.cpu_max) || 100, 0.5);
+    this.sim.mem = this.fluctuate(this.sim.mem, Number(c.mem_min) || 0, Number(c.mem_max) || 100, 0.2);
+    this.sim.swap = this.fluctuate(this.sim.swap, Number(c.swap_min) || 0, Number(c.swap_max) || 100, 0.1);
+    this.sim.disk = this.fluctuate(this.sim.disk, Number(c.disk_min) || 0, Number(c.disk_max) || 100, 0.01);
 
     var netUp = this.rand(c.net_min || 100, c.net_max || 5000);
     var netDown = this.rand(c.net_min || 100, c.net_max || 5000);
@@ -328,30 +344,26 @@ Agent.prototype.sendData = function () {
     var baseLoad = (this.sim.cpu / 100) * (c.cpu_cores || 1);
     var load1 = parseFloat((baseLoad * this.randFloat(0.8, 1.2)).toFixed(2));
 
-    this.sim.mem = this.fluctuate(this.sim.mem, c.mem_min || 0, c.mem_max || 60, 0.2); // 减小内存波动
-    this.sim.swap = this.fluctuate(this.sim.swap, c.swap_min || 0, c.swap_max || 0, 0.1);
-    this.sim.disk = this.fluctuate(this.sim.disk, c.disk_min || 0, c.disk_max || 10, 0.01); // 硬盘几乎不动
-
-    // 连接数和进程数也进行平滑波动
     this.sim.conn = Math.round(this.fluctuate(this.sim.conn, c.conn_min || 2, c.conn_max || 10, 0.5));
     if (this.sim.conn < (c.conn_min || 2)) this.sim.conn = c.conn_min || 2;
     this.sim.proc = Math.round(this.fluctuate(this.sim.proc, c.proc_min || 40, c.proc_max || 60, 0.5));
     if (this.sim.proc < (c.proc_min || 40)) this.sim.proc = c.proc_min || 40;
 
-    var ramTotal = (c.ram_total || 1024) * 1048576;
-    var swapTotal = (c.swap_total || 0) * 1048576;
-    var diskTotal = (c.disk_total || 10240) * 1048576;
+    var ramTotal = Math.floor((Number(c.ram_total) || 1024) * 1048576);
+    var swapTotal = Math.floor((Number(c.swap_total) || 0) * 1048576);
+    var diskTotal = Math.floor((Number(c.disk_total) || 10240) * 1048576);
 
     var memUsed = Math.floor(ramTotal * this.sim.mem / 100);
     var swapUsed = Math.floor(swapTotal * this.sim.swap / 100);
     var diskUsed = Math.floor(diskTotal * this.sim.disk / 100);
 
     var data = {
+        type: 'report',
         cpu: { usage: parseFloat(this.sim.cpu.toFixed(1)) },
         ram: { total: ramTotal, used: memUsed },
         swap: { total: swapTotal, used: swapUsed },
         disk: { total: diskTotal, used: diskUsed },
-        load: { load1: load1, load5: load1, load15: load1 },
+        load: { load1: load1, load5: parseFloat((load1 * 0.92).toFixed(2)), load15: parseFloat((load1 * 0.85).toFixed(2)) },
         network: { up: netUp, down: netDown, totalUp: this.state.totalUp, totalDown: this.state.totalDown },
         connections: { tcp: this.sim.conn, udp: this.rand(0, 5) },
         process: this.sim.proc,
@@ -362,7 +374,6 @@ Agent.prototype.sendData = function () {
     try {
         this.ws.send(JSON.stringify(data));
         this.state.sendCount++;
-        if (this.state.sendCount <= 3) console.log('[vKomari] Sent:', JSON.stringify(data));
     } catch (e) {
         console.log('[vKomari] Send error:', e.message);
     }
