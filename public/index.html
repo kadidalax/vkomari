@@ -7,9 +7,78 @@
     <title>vKomari</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="dropdown_data.js"></script>
     <style>
         [x-cloak] {
             display: none !important;
+        }
+
+        :root {
+            --bg-dark: #0b0b0e;
+            --card-bg: rgba(23, 23, 26, 0.7);
+            --border-color: rgba(63, 63, 70, 0.3);
+            --accent-main: #10b981;
+            --accent-glow: rgba(16, 185, 129, 0.3);
+            --zinc-950: #09090b;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.03) 0px, transparent 50%);
+            background-attachment: fixed;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #e4e4e7;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .node-card {
+            background: rgba(24, 24, 27, 0.6);
+            border: 1px solid rgba(63, 63, 70, 0.3);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .node-card:hover {
+            transform: translateY(-5px) scale(1.01);
+            border-color: rgba(16, 185, 129, 0.4);
+            background: rgba(30, 30, 35, 0.8);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(63, 63, 70, 0.2);
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #71717a;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 13px;
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
         }
 
         .toggle-bg:after {
@@ -17,37 +86,111 @@
             position: absolute;
             top: 2px;
             left: 2px;
-            width: 18px;
-            height: 18px;
+            width: 14px;
+            height: 14px;
             background: white;
             border-radius: 50%;
-            transition: 0.2s;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         input:checked+.toggle-bg:after {
-            transform: translateX(100%);
+            transform: translateX(0.75rem);
         }
 
         input:checked+.toggle-bg {
-            background-color: #10b981;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
 
-        /* 滚动条美化 */
-        ::-webkit-scrollbar {
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
         }
 
-        ::-webkit-scrollbar-track {
-            background: #27272a;
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
         }
 
-        ::-webkit-scrollbar-thumb {
-            background: #52525b;
-            border-radius: 3px;
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(63, 63, 70, 0.4);
+            border-radius: 10px;
         }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background: #71717a;
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(16, 185, 129, 0.4);
+        }
+
+        /* Toasts */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            pointer-events: none;
+        }
+
+        .toast {
+            pointer-events: auto;
+            min-width: 280px;
+            max-width: 400px;
+            background: rgba(24, 24, 27, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(63, 63, 70, 0.4);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            animation: toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes toast-in {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast-success {
+            border-left: 4px solid #10b981;
+        }
+
+        .toast-error {
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast-info {
+            border-left: 4px solid #3b82f6;
+        }
+
+        .toast-warning {
+            border-left: 4px solid #f59e0b;
+        }
+
+        /* Custom Modal Animations */
+        .modal-enter {
+            animation: modal-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes modal-in {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
         }
     </style>
 </head>
@@ -58,7 +201,7 @@
     <div x-show="!token" class="min-h-screen flex items-center justify-center p-4">
         <div class="w-full max-w-sm">
             <h1 class="text-4xl font-bold text-emerald-400 text-center mb-2">vKomari</h1>
-            <p class="text-zinc-500 text-center mb-6 text-sm">虚拟探针集群管理系统</p>
+            <p class="text-zinc-500 text-center mb-6 text-sm">虚拟探针集群管理系统 (Port: 25770)</p>
             <div class="bg-zinc-800 border border-zinc-700 rounded-xl p-6 shadow-xl">
                 <form @submit.prevent="login" class="space-y-4">
                     <div>
@@ -97,6 +240,12 @@
                     <button @click="batchAction('stop')"
                         class="px-3 py-1.5 text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded border border-red-600/20 transition">全部停止</button>
                     <div class="w-px h-6 bg-zinc-700 mx-1"></div>
+                    <button @click="exportNodes"
+                        class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">导出</button>
+                    <button @click="$refs.importFile.click()"
+                        class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">导入</button>
+                    <input type="file" x-ref="importFile" @change="importNodes" class="hidden" accept=".json">
+                    <div class="w-px h-6 bg-zinc-700 mx-1"></div>
                     <button @click="showPwdModal=true"
                         class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">改密</button>
                     <button @click="logout"
@@ -110,6 +259,22 @@
         </header>
 
         <main class="max-w-7xl mx-auto p-4 sm:p-6">
+            <!-- 分组/搜索 -->
+            <div class="flex flex-wrap gap-4 mb-6">
+                <div class="flex-1 min-w-[200px]">
+                    <input type="text" x-model="searchQuery" placeholder="搜索节点名称、地址、分组..."
+                        class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                </div>
+                <div class="flex gap-2">
+                    <template x-for="g in groups" :key="g">
+                        <button @click="activeGroup = (activeGroup === g ? '' : g)"
+                            class="px-3 py-1.5 text-xs rounded-full border transition"
+                            :class="activeGroup === g ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200'"
+                            x-text="g || '未分组'"></button>
+                    </template>
+                </div>
+            </div>
+
             <!-- 统计卡片 -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-zinc-800 border border-zinc-700 rounded-xl p-4">
@@ -134,61 +299,75 @@
             </div>
 
             <!-- 节点列表 -->
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                <template x-for="n in nodes" :key="n.id">
-                    <div
-                        class="bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden hover:border-zinc-600 transition group">
-                        <div class="p-4 border-b border-zinc-700/50 flex justify-between items-center bg-zinc-800/50">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="relative">
-                                    <div class="w-2.5 h-2.5 rounded-full"
-                                        :class="n.online?'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]':'bg-zinc-600'">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                <template x-for="n in filteredNodes" :key="n.id">
+                    <div class="glass-card rounded-xl overflow-hidden node-card flex flex-col">
+                        <!-- Card Header - 更紧凑 -->
+                        <div
+                            class="px-3 py-2.5 flex justify-between items-start border-b border-white/5 bg-white/[0.02]">
+                            <div class="flex gap-2 min-w-0 flex-1">
+                                <div class="relative mt-1 flex-shrink-0">
+                                    <div class="w-2 h-2 rounded-full"
+                                        :class="n.online ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : (n.lastError ? 'bg-amber-400' : 'bg-red-500')">
                                     </div>
                                     <div x-show="n.online"
-                                        class="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping opacity-75">
+                                        class="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-60">
                                     </div>
                                 </div>
-                                <div class="flex flex-col min-w-0">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-bold truncate text-zinc-200" x-text="n.name"></span>
-                                        <span class="text-sm" x-text="getFlag(n.region)"></span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-semibold text-zinc-100 text-sm truncate"
+                                            x-text="n.name"></span>
+                                        <span class="text-sm flex-shrink-0" x-text="getFlag(n.region)"></span>
                                     </div>
-                                    <span class="text-xs text-zinc-500 truncate" x-text="n.server_address"></span>
+                                    <div class="text-[10px] text-zinc-500 font-mono truncate" x-text="n.server_address">
+                                    </div>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-3 shrink-0">
-                                <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded border" :class="{
-                                          'bg-emerald-500/10 text-emerald-400 border-emerald-500/20':n.load_profile==='low',
-                                          'bg-amber-500/10 text-amber-400 border-amber-500/20':n.load_profile==='mid',
-                                          'bg-red-500/10 text-red-400 border-red-500/20':n.load_profile==='high'
-                                      }" x-text="n.load_profile"></span>
+                            <div class="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
                                 <label class="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" class="sr-only peer" :checked="n.enabled"
                                         @change="toggleNode(n.id,$event.target.checked)">
-                                    <div
-                                        class="toggle-bg w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full relative border border-zinc-600">
+                                    <div class="toggle-bg w-8 h-5 bg-zinc-800 border border-white/10 rounded-full">
                                     </div>
                                 </label>
+                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border" :class="{
+                                    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20': n.load_profile==='low',
+                                    'bg-amber-500/10 text-amber-400 border-amber-500/20': n.load_profile==='mid',
+                                    'bg-red-500/10 text-red-400 border-red-500/20': n.load_profile==='high'
+                                }" x-text="n.load_profile"></span>
                             </div>
                         </div>
-                        <div class="p-4 space-y-2 text-sm">
-                            <div class="flex justify-between items-center"><span class="text-zinc-500">配置</span><span
-                                    class="text-zinc-300 font-mono" x-text="n.cpu_cores+'C / '+n.ram_total+'MB'"></span>
+
+                        <!-- Card Body - 更紧凑，移除网络 -->
+                        <div class="px-3 py-2 flex-1 space-y-0.5">
+                            <div class="flex justify-between items-center py-1">
+                                <span class="text-[10px] text-zinc-500 uppercase">配置</span>
+                                <span class="text-xs font-mono text-emerald-400"
+                                    x-text="n.cpu_cores+'C / '+n.ram_total+'MB'"></span>
                             </div>
-                            <div class="flex justify-between items-center"><span class="text-zinc-500">系统</span><span
-                                    class="text-zinc-300 text-xs truncate max-w-[180px]" x-text="n.os"></span></div>
-                            <div class="flex justify-between items-center"><span class="text-zinc-500">内核</span><span
-                                    class="text-zinc-300 text-xs truncate max-w-[180px]"
-                                    x-text="n.kernel_version"></span></div>
-                            <div class="flex justify-between items-center pt-1 border-t border-zinc-700/50"><span
-                                    class="text-zinc-500">上报统计</span><span class="text-emerald-400 font-mono"
-                                    x-text="n.sendCount||0"></span></div>
+                            <div class="flex justify-between items-center py-1">
+                                <span class="text-[10px] text-zinc-500 uppercase">系统</span>
+                                <span class="text-[11px] text-zinc-300 truncate max-w-[120px]" x-text="n.os"></span>
+                            </div>
+                            <div class="flex justify-between items-center py-1" x-show="n.group_name">
+                                <span class="text-[10px] text-zinc-500 uppercase">分组</span>
+                                <span
+                                    class="text-[10px] text-zinc-400 px-1.5 py-0.5 bg-zinc-800/80 rounded border border-zinc-700/50"
+                                    x-text="n.group_name"></span>
+                            </div>
+                            <div class="flex justify-between items-center py-1">
+                                <span class="text-[10px] text-zinc-500 uppercase">上报</span>
+                                <span class="text-xs font-mono text-zinc-400" x-text="n.sendCount || 0"></span>
+                            </div>
                         </div>
-                        <div class="px-4 py-3 border-t border-zinc-700/50 flex gap-2 bg-zinc-800/30">
+
+                        <!-- Card Footer - 更紧凑 -->
+                        <div class="px-3 py-2 bg-zinc-900/40 border-t border-white/5 flex gap-2">
                             <button @click="editNode(n)"
-                                class="flex-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 py-1.5 rounded-lg text-xs font-medium transition">配置</button>
+                                class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-1.5 rounded-lg text-[11px] font-medium transition active:scale-95 border border-zinc-700/50">配置</button>
                             <button @click="deleteNode(n.id)"
-                                class="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/10 py-1.5 rounded-lg text-xs font-medium transition">删除</button>
+                                class="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500/80 py-1.5 rounded-lg text-[11px] font-medium transition active:scale-95 border border-red-500/10">删除</button>
                         </div>
                     </div>
                 </template>
@@ -202,22 +381,84 @@
     </div>
 
     <!-- 编辑弹窗 -->
-    <div x-show="showModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+    <div x-show="showModal" @click.self="showModal = false"
+        class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50"
         style="display:none" x-transition.opacity>
         <div
-            class="bg-zinc-800 border border-zinc-700 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
-            <div class="p-5 border-b border-zinc-700 flex justify-between items-center sticky top-0 bg-zinc-800 z-10">
-                <h2 class="text-lg font-bold text-zinc-100" x-text="form.id?'编辑节点配置':'新建虚拟节点'"></h2>
-                <button @click="showModal=false"
-                    class="text-zinc-500 hover:text-zinc-300 transition p-1 hover:bg-zinc-700 rounded">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            class="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col modal-enter">
+            <div
+                class="p-6 border-b border-white/5 flex justify-between items-center bg-zinc-900/50 backdrop-blur-xl z-20">
+                <div class="flex items-center gap-4">
+                    <div
+                        class="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white" x-text="form.id ? '编辑节点配置' : '新建虚拟节点'"></h2>
+                        <p class="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">Node Configuration Portal
+                        </p>
+                    </div>
+                    <div class="relative ml-4" x-data="{ open: false }">
+                        <button @click="open = !open"
+                            class="text-xs bg-zinc-800 hover:bg-zinc-700 border border-white/5 px-4 py-1.5 rounded-lg text-zinc-300 transition flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-.293.707L13 11.414V17a1 1 0 01-.447.894l-2 1A1 1 0 019 18v-6.586l-6.707-6.707A1 1 0 013 7V5z">
+                                </path>
+                            </svg>
+                            模板库 <span class="text-[10px] opacity-40" x-text="open ? '▲' : '▼'"></span>
+                        </button>
+                        <div x-show="open" @click.away="open = false"
+                            class="absolute left-0 mt-3 w-72 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-2xl">
+                            <div class="p-3 border-b border-white/5 bg-white/5">
+                                <div class="flex gap-2">
+                                    <input type="text" x-model="newTemplateName" placeholder="保存当前为模板..."
+                                        class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-emerald-500 focus:outline-none placeholder-zinc-500">
+                                    <button @click="saveAsTemplate(); open=false"
+                                        class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">保存</button>
+                                </div>
+                            </div>
+                            <div class="max-h-60 overflow-y-auto p-2 space-y-1">
+                                <template x-for="t in templates" :key="t.id">
+                                    <div
+                                        class="flex items-center group p-2.5 hover:bg-white/5 rounded-xl cursor-pointer transition">
+                                        <div @click="applyTemplate(t); open=false" class="flex-1 min-w-0">
+                                            <div class="text-sm font-medium text-zinc-200 truncate" x-text="t.name">
+                                            </div>
+                                            <div class="text-[10px] text-zinc-500"
+                                                x-text="t.config.cpu_cores + 'C ' + t.config.ram_total + 'MB'"></div>
+                                        </div>
+                                        <button @click.stop="deleteTemplate(t.id)"
+                                            class="text-zinc-600 hover:text-red-400 p-1.5 opacity-0 group-hover:opacity-100 transition">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                                </path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
+                                <div x-show="templates.length === 0" class="p-8 text-center">
+                                    <p class="text-xs text-zinc-500">暂无模板</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button @click="showModal = false"
+                    class="text-zinc-500 hover:text-white transition p-2 hover:bg-white/5 rounded-xl">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
                         </path>
                     </svg>
                 </button>
             </div>
 
-            <div class="p-6 space-y-6">
+            <div class="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
                 <!-- 基础信息 -->
                 <div class="space-y-4">
                     <h3 class="text-sm font-medium text-emerald-400 uppercase tracking-wider">基础信息</h3>
@@ -225,6 +466,11 @@
                         <div>
                             <label class="block text-xs text-zinc-400 mb-1.5">节点名称</label>
                             <input type="text" x-model="form.name"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">分组名称 (可选)</label>
+                            <input type="text" x-model="form.group_name" placeholder="例如: 香港集群"
                                 class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
                         </div>
                         <div class="relative">
@@ -239,7 +485,7 @@
                             <div x-show="showCountryList"
                                 class="absolute z-20 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg max-h-60 overflow-y-auto shadow-xl">
                                 <template x-for="c in filteredCountries" :key="c.code">
-                                    <div @mousedown.prevent="form.region=c.code;countrySearch=c.name;showCountryList=false"
+                                    <div @mousedown.prevent="form.region=c.code;countrySearch=c.name;showCountryList=false;generateIpForRegion(c.code)"
                                         class="px-3 py-2 hover:bg-zinc-700 cursor-pointer text-sm flex items-center gap-2 transition">
                                         <span class="text-lg" x-text="c.flag"></span>
                                         <span class="text-zinc-300" x-text="c.name"></span>
@@ -247,6 +493,11 @@
                                     </div>
                                 </template>
                             </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1.5">虚拟 IPv4 (显示在面板, 可填 Hidden)</label>
+                            <input type="text" x-model="form.fake_ip" placeholder="例如: 8.8.8.8"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -273,20 +524,9 @@
                             <label class="block text-xs text-zinc-400 mb-1.5">操作系统</label>
                             <select x-model="form.os" @change="onOsChange()"
                                 class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
-                                <option value="Debian GNU/Linux 12 (bookworm)">Debian 12</option>
-                                <option value="Debian GNU/Linux 11 (bullseye)">Debian 11</option>
-                                <option value="Ubuntu 24.04 LTS">Ubuntu 24.04 LTS</option>
-                                <option value="Ubuntu 22.04 LTS">Ubuntu 22.04 LTS</option>
-                                <option value="Ubuntu 20.04 LTS">Ubuntu 20.04 LTS</option>
-                                <option value="CentOS Stream 9">CentOS Stream 9</option>
-                                <option value="Rocky Linux 9">Rocky Linux 9</option>
-                                <option value="AlmaLinux 9">AlmaLinux 9</option>
-                                <option value="Fedora 40">Fedora 40</option>
-                                <option value="Arch Linux">Arch Linux</option>
-                                <option value="Alpine Linux 3.20">Alpine Linux 3.20</option>
-                                <option value="openSUSE Leap 15.6">openSUSE Leap 15.6</option>
-                                <option value="Windows Server 2022">Windows Server 2022</option>
-                                <option value="Windows 11">Windows 11</option>
+                                <template x-for="item in dd.os" :key="item.value">
+                                    <option :value="item.value" x-text="item.label"></option>
+                                </template>
                             </select>
                         </div>
                         <div>
@@ -302,49 +542,48 @@
                             <label class="block text-xs text-zinc-400 mb-1.5">架构</label>
                             <select x-model="form.arch"
                                 class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
-                                <option value="amd64">amd64 (x86_64)</option>
-                                <option value="aarch64">aarch64 (ARM64)</option>
-                                <option value="i386">i386 (x86)</option>
-                                <option value="armv7l">armv7l (ARM32)</option>
-                                <option value="riscv64">riscv64</option>
+                                <template x-for="item in dd.arch" :key="item.value">
+                                    <option :value="item.value" x-text="item.label"></option>
+                                </template>
                             </select>
                         </div>
                         <div>
                             <label class="block text-xs text-zinc-400 mb-1.5">虚拟化技术</label>
                             <select x-model="form.virtualization"
                                 class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
-                                <option value="kvm">KVM</option>
-                                <option value="vmware">VMware</option>
-                                <option value="hyperv">Hyper-V</option>
-                                <option value="xen">Xen</option>
-                                <option value="lxc">LXC</option>
-                                <option value="openvz">OpenVZ</option>
-                                <option value="docker">Docker</option>
-                                <option value="none">物理机 (None)</option>
+                                <template x-for="item in dd.virtualization" :key="item.value">
+                                    <option :value="item.value" x-text="item.label"></option>
+                                </template>
                             </select>
                         </div>
                         <div class="md:col-span-1">
                             <label class="block text-xs text-zinc-400 mb-1.5">CPU 型号</label>
                             <select x-model="form.cpu_model"
                                 class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
-                                <option value="Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz">Intel Xeon E5-2690 v4</option>
-                                <option value="Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz">Intel Xeon Platinum
-                                    8259CL</option>
-                                <option value="Intel(R) Xeon(R) Gold 6133 CPU @ 2.50GHz">Intel Xeon Gold 6133</option>
-                                <option value="AMD EPYC 7763 64-Core Processor">AMD EPYC 7763</option>
-                                <option value="AMD EPYC 7B12 64-Core Processor">AMD EPYC 7B12</option>
-                                <option value="AMD Ryzen 9 5950X 16-Core Processor">AMD Ryzen 9 5950X</option>
-                                <option value="Intel(R) Core(TM) i9-13900K">Intel Core i9-13900K</option>
-                                <option value="Ampere Altra Q80-30">Ampere Altra Q80 (ARM)</option>
-                                <option value="Apple M2 Pro">Apple M2 Pro</option>
-                                <option value="QEMU Virtual CPU version 2.5+">QEMU Virtual CPU</option>
-                                <option value="Common KVM processor">KVM Processor</option>
+                                <template x-for="item in dd.cpuModels" :key="item.value">
+                                    <option :value="item.value" x-text="item.label"></option>
+                                </template>
                             </select>
                         </div>
                         <div class="md:col-span-1">
-                            <label class="block text-xs text-zinc-400 mb-1.5">启动时间 (留空为当前)</label>
-                            <input type="date" x-model="form.boot_time_date"
-                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition text-zinc-300">
+                            <label class="block text-xs text-zinc-400 mb-1.5">GPU 型号 (留空禁用)</label>
+                            <select x-model="form.gpu_name"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                                <template x-for="item in dd.gpuModels" :key="item.value">
+                                    <option :value="item.value" x-text="item.label"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs text-zinc-400 mb-1.5">开机日期 (年/月/日)</label>
+                            <input type="date" x-model="form.boot_date"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs text-zinc-400 mb-1.5">月流量重置日 (1-28)</label>
+                            <input type="number" x-model.number="form.traffic_reset_day" min="1" max="28"
+                                placeholder="1"
+                                class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
                         </div>
                     </div>
                 </div>
@@ -365,7 +604,7 @@
                             <div class="flex">
                                 <input type="number" x-model.number="form.ram_total"
                                     class="w-full bg-zinc-900 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition border-r-0">
-                                <button @click="form.ram_unit = form.ram_unit === 'MB' ? 'GB' : 'MB'"
+                                <button @click="toggleUnit('ram')"
                                     class="bg-zinc-800 border-y border-r border-zinc-700 px-2 text-xs rounded-r-lg hover:bg-zinc-700 transition"
                                     x-text="form.ram_unit"></button>
                             </div>
@@ -376,7 +615,7 @@
                             <div class="flex">
                                 <input type="number" x-model.number="form.swap_total"
                                     class="w-full bg-zinc-900 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition border-r-0">
-                                <button @click="form.swap_unit = form.swap_unit === 'MB' ? 'GB' : 'MB'"
+                                <button @click="toggleUnit('swap')"
                                     class="bg-zinc-800 border-y border-r border-zinc-700 px-2 text-xs rounded-r-lg hover:bg-zinc-700 transition"
                                     x-text="form.swap_unit"></button>
                             </div>
@@ -387,7 +626,7 @@
                             <div class="flex">
                                 <input type="number" x-model.number="form.disk_total"
                                     class="w-full bg-zinc-900 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition border-r-0">
-                                <button @click="form.disk_unit = form.disk_unit === 'MB' ? 'GB' : 'MB'"
+                                <button @click="toggleUnit('disk')"
                                     class="bg-zinc-800 border-y border-r border-zinc-700 px-2 text-xs rounded-r-lg hover:bg-zinc-700 transition"
                                     x-text="form.disk_unit"></button>
                             </div>
@@ -465,13 +704,13 @@
                             <!-- 网速 -->
                             <div class="space-y-1">
                                 <div class="flex justify-between items-center">
-                                    <label class="text-xs text-zinc-400">实时网速</label>
                                     <div class="flex items-center gap-2">
+                                        <label class="text-xs text-zinc-400">实时网速</label>
                                         <button @click="toggleNetUnit()"
                                             class="text-[10px] bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-zinc-400 hover:text-white transition"
                                             x-text="form.net_unit"></button>
-                                        <span class="text-xs text-zinc-500">Min - Max</span>
                                     </div>
+                                    <span class="text-xs text-zinc-500">Min - Max</span>
                                 </div>
                                 <div class="flex gap-2 items-center">
                                     <input type="number" x-model.number="form.net_min"
@@ -516,72 +755,117 @@
                 </div>
             </div>
 
-            <div
-                class="p-5 border-t border-zinc-700 flex justify-end gap-3 sticky bottom-0 bg-zinc-800 z-10 rounded-b-xl">
+            <div class="p-6 border-t border-white/5 flex justify-end gap-3 bg-zinc-900/80 backdrop-blur-xl">
                 <button @click="showModal=false"
-                    class="px-5 py-2.5 text-zinc-400 hover:text-zinc-200 transition">取消</button>
+                    class="px-6 py-2.5 text-zinc-400 hover:text-zinc-100 font-medium transition">取消</button>
                 <button @click="saveNode"
-                    class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium shadow-lg shadow-emerald-900/20 transition">保存配置</button>
+                    class="px-10 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl font-bold shadow-xl shadow-emerald-900/30 transition transform active:scale-95">保存配置</button>
             </div>
         </div>
     </div>
 
     <!-- 改密弹窗 -->
-    <div x-show="showPwdModal"
-        class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+    <div x-show="showPwdModal" @click.self="if(!isDefaultPwd) showPwdModal = false"
+        class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50"
         style="display:none" x-transition.opacity>
-        <div class="bg-zinc-800 border border-zinc-700 rounded-xl w-full max-w-sm p-6 shadow-2xl">
-            <h2 class="text-lg font-bold text-amber-400 mb-4">修改管理员密码</h2>
-            <div class="space-y-4">
-                <input type="password" x-model="newPassword" @keyup.enter="changePassword" placeholder="输入新密码 (至少6位)"
-                    class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 focus:border-amber-500 focus:outline-none transition">
+        <div
+            class="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl modal-enter">
+            <div class="bg-gradient-to-br from-amber-500/20 to-transparent p-6 pb-4">
+                <div class="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center text-amber-500 mb-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                        </path>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-white">修改管理员密码</h2>
+                <p class="text-zinc-400 text-sm mt-1">为了您的账号安全，请定期更换密码</p>
+            </div>
+            <div class="p-6 pt-2 space-y-4">
+                <div class="relative">
+                    <input type="password" x-model="newPassword" @keyup.enter="changePassword"
+                        placeholder="输入新密码 (至少6位)"
+                        class="w-full bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3.5 focus:border-amber-500 focus:outline-none transition text-white placeholder-zinc-500">
+                </div>
                 <div class="flex gap-3 pt-2">
                     <button x-show="!isDefaultPwd" @click="showPwdModal=false"
-                        class="flex-1 text-zinc-500 hover:text-zinc-300 transition">取消</button>
+                        class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition">取消</button>
                     <button @click="changePassword"
-                        class="flex-1 bg-amber-600 hover:bg-amber-500 text-white py-2.5 rounded-lg font-semibold transition shadow-lg shadow-amber-900/20">确认修改</button>
+                        class="flex-1 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white py-3 rounded-xl font-bold transition shadow-lg shadow-amber-900/30">确认修改</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- 通用对话框 (Alert/Confirm) -->
+    <div x-show="confirmDialog.show" @click.self="confirmDialog.show = false"
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
+        style="display:none" x-transition.opacity>
+        <div
+            class="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl modal-enter">
+            <div class="p-6 text-center">
+                <div class="w-16 h-16 mx-auto bg-zinc-800 rounded-full flex items-center justify-center mb-4">
+                    <template x-if="confirmDialog.type === 'info'">
+                        <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </template>
+                    <template x-if="confirmDialog.type === 'danger'">
+                        <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                            </path>
+                        </svg>
+                    </template>
+                    <template x-if="confirmDialog.type === 'success'">
+                        <svg class="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7">
+                            </path>
+                        </svg>
+                    </template>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2" x-text="confirmDialog.title"></h3>
+                <p class="text-zinc-400 text-sm" x-text="confirmDialog.message"></p>
+            </div>
+            <div class="p-4 bg-zinc-800/50 flex gap-3">
+                <button x-show="confirmDialog.isConfirm" @click="confirmDialog.onCancel()"
+                    class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl text-sm font-medium transition">取消</button>
+                <button @click="confirmDialog.onConfirm()"
+                    :class="confirmDialog.type === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-emerald-600 hover:bg-emerald-500'"
+                    class="flex-1 text-white py-2.5 rounded-xl text-sm font-bold transition shadow-lg"
+                    x-text="confirmDialog.confirmText"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div class="toast-container">
+        <template x-for="t in toasts" :key="t.id">
+            <div class="toast" :class="'toast-' + t.type" x-transition>
+                <div class="flex-shrink-0">
+                    <template x-if="t.type === 'success'"><svg class="w-5 h-5 text-emerald-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7">
+                            </path>
+                        </svg></template>
+                    <template x-if="t.type === 'error'"><svg class="w-5 h-5 text-red-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg></template>
+                    <template x-if="t.type === 'info'"><svg class="w-5 h-5 text-blue-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg></template>
+                </div>
+                <div class="text-sm font-medium text-zinc-200" x-text="t.message"></div>
+            </div>
+        </template>
+    </div>
+
     <script>
-        // OS到内核版本映射
-        const KERNEL_MAP = {
-            'Debian GNU/Linux 12 (bookworm)': ['6.1.0-18-amd64', '6.1.0-25-amd64', '6.1.0-28-amd64'],
-            'Debian GNU/Linux 11 (bullseye)': ['5.10.0-28-amd64', '5.10.0-30-amd64'],
-            'Ubuntu 24.04 LTS': ['6.8.0-31-generic', '6.8.0-40-generic', '6.8.0-45-generic'],
-            'Ubuntu 22.04 LTS': ['6.5.0-44-generic', '5.15.0-91-generic', '5.15.0-100-generic'],
-            'Ubuntu 20.04 LTS': ['5.15.0-91-generic', '5.4.0-150-generic', '5.4.0-170-generic'],
-            'CentOS Stream 9': ['5.14.0-362.8.1.el9_3', '5.14.0-427.el9', '5.14.0-503.el9'],
-            'Rocky Linux 9': ['5.14.0-362.8.1.el9_3', '5.14.0-427.el9'],
-            'AlmaLinux 9': ['5.14.0-362.8.1.el9_3', '5.14.0-427.el9'],
-            'Fedora 40': ['6.8.5-301.fc40', '6.9.4-200.fc40'],
-            'Arch Linux': ['6.6.30-2-lts', '6.7.9-arch1-1', '6.8.1-arch1-1'],
-            'Alpine Linux 3.20': ['6.6.32-0-lts', '6.6.35-0-lts'],
-            'openSUSE Leap 15.6': ['5.14.21-150500.55.73', '6.4.0-150600.21'],
-            'Windows Server 2022': ['10.0.20348', '10.0.25398'],
-            'Windows 11': ['10.0.22621', '10.0.22631', '10.0.26100']
-        };
-
-        // 完整国家代码列表
-        const COUNTRIES = [
-            { code: 'CN', name: '中国', flag: '🇨🇳' }, { code: 'HK', name: '香港', flag: '🇭🇰' }, { code: 'TW', name: '台湾', flag: '🇹🇼' }, { code: 'MO', name: '澳门', flag: '🇲🇴' },
-            { code: 'US', name: '美国', flag: '🇺🇸' }, { code: 'JP', name: '日本', flag: '🇯🇵' }, { code: 'KR', name: '韩国', flag: '🇰🇷' }, { code: 'SG', name: '新加坡', flag: '🇸🇬' },
-            { code: 'GB', name: '英国', flag: '🇬🇧' }, { code: 'DE', name: '德国', flag: '🇩🇪' }, { code: 'FR', name: '法国', flag: '🇫🇷' }, { code: 'NL', name: '荷兰', flag: '🇳🇱' },
-            { code: 'RU', name: '俄罗斯', flag: '🇷🇺' }, { code: 'CA', name: '加拿大', flag: '🇨🇦' }, { code: 'AU', name: '澳大利亚', flag: '🇦🇺' }, { code: 'IN', name: '印度', flag: '🇮🇳' },
-            { code: 'TH', name: '泰国', flag: '🇹🇭' }, { code: 'VN', name: '越南', flag: '🇻🇳' }, { code: 'MY', name: '马来西亚', flag: '🇲🇾' }, { code: 'ID', name: '印尼', flag: '🇮🇩' },
-            { code: 'PH', name: '菲律宾', flag: '🇵🇭' }, { code: 'BR', name: '巴西', flag: '🇧🇷' }, { code: 'AR', name: '阿根廷', flag: '🇦🇷' }, { code: 'MX', name: '墨西哥', flag: '🇲🇽' },
-            { code: 'ZA', name: '南非', flag: '🇿🇦' }, { code: 'EG', name: '埃及', flag: '🇪🇬' }, { code: 'TR', name: '土耳其', flag: '🇹🇷' }, { code: 'SA', name: '沙特', flag: '🇸🇦' },
-            { code: 'AE', name: '阿联酋', flag: '🇦🇪' }, { code: 'IL', name: '以色列', flag: '🇮🇱' }, { code: 'IT', name: '意大利', flag: '🇮🇹' }, { code: 'ES', name: '西班牙', flag: '🇪🇸' },
-            { code: 'PT', name: '葡萄牙', flag: '🇵🇹' }, { code: 'PL', name: '波兰', flag: '🇵🇱' }, { code: 'SE', name: '瑞典', flag: '🇸🇪' }, { code: 'NO', name: '挪威', flag: '🇳🇴' },
-            { code: 'FI', name: '芬兰', flag: '🇫🇮' }, { code: 'DK', name: '丹麦', flag: '🇩🇰' }, { code: 'CH', name: '瑞士', flag: '🇨🇭' }, { code: 'AT', name: '奥地利', flag: '🇦🇹' },
-            { code: 'BE', name: '比利时', flag: '🇧🇪' }, { code: 'IE', name: '爱尔兰', flag: '🇮🇪' }, { code: 'CZ', name: '捷克', flag: '🇨🇿' }, { code: 'RO', name: '罗马尼亚', flag: '🇷🇴' },
-            { code: 'HU', name: '匈牙利', flag: '🇭🇺' }, { code: 'GR', name: '希腊', flag: '🇬🇷' }, { code: 'UA', name: '乌克兰', flag: '🇺🇦' }, { code: 'KZ', name: '哈萨克斯坦', flag: '🇰🇿' },
-            { code: 'NZ', name: '新西兰', flag: '🇳🇿' }, { code: 'CL', name: '智利', flag: '🇨🇱' }, { code: 'CO', name: '哥伦比亚', flag: '🇨🇴' }, { code: 'PE', name: '哥伦比亚', flag: '🇵🇪' },
-            { code: 'PK', name: '巴基斯坦', flag: '🇵🇰' }, { code: 'BD', name: '孟加拉', flag: '🇧🇩' }, { code: 'NG', name: '尼日利亚', flag: '🇳🇬' }, { code: 'KE', name: '肯尼亚', flag: '🇰🇪' }
-        ].sort((a, b) => a.code.localeCompare(b.code));
-
         function app() {
             return {
                 token: localStorage.getItem('vkomari_token') || '',
@@ -597,18 +881,78 @@
                 countrySearch: '',
                 showCountryList: false,
 
+                // Toasts & Dialogs
+                toasts: [],
+                confirmDialog: { show: false, title: '', message: '', type: 'info', isConfirm: false, confirmText: '确定', onConfirm: () => { }, onCancel: () => { } },
+
+                notify(message, type = 'info') {
+                    const id = Date.now();
+                    this.toasts.push({ id, message, type });
+                    setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 3000);
+                },
+
+                showAlert(title, message, type = 'info') {
+                    return new Promise(resolve => {
+                        this.confirmDialog = {
+                            show: true, title, message, type, isConfirm: false, confirmText: '知道了',
+                            onConfirm: () => { this.confirmDialog.show = false; resolve(); }
+                        };
+                    });
+                },
+
+                showConfirm(title, message, type = 'danger', confirmText = '确定') {
+                    return new Promise(resolve => {
+                        this.confirmDialog = {
+                            show: true, title, message, type, isConfirm: true, confirmText,
+                            onConfirm: () => { this.confirmDialog.show = false; resolve(true); },
+                            onCancel: () => { this.confirmDialog.show = false; resolve(false); }
+                        };
+                    });
+                },
+
+                newTemplateName: '',
+                templates: [],
+                searchQuery: '',
+                activeGroup: '',
+
+                // 引用外部数据
+                dd: DROPDOWN_DATA,
+
+                get groups() {
+                    const g = new Set(this.nodes.map(n => n.group_name || ''));
+                    return Array.from(g).sort();
+                },
+
+                get filteredNodes() {
+                    let filtered = this.nodes;
+                    if (this.activeGroup !== '') {
+                        filtered = filtered.filter(n => (n.group_name || '') === this.activeGroup);
+                    }
+                    if (this.searchQuery) {
+                        const s = this.searchQuery.toLowerCase();
+                        filtered = filtered.filter(n =>
+                            n.name.toLowerCase().includes(s) ||
+                            n.server_address.toLowerCase().includes(s) ||
+                            (n.group_name && n.group_name.toLowerCase().includes(s))
+                        );
+                    }
+                    return filtered;
+                },
+
                 get filteredCountries() {
                     const s = this.countrySearch.toLowerCase();
-                    return COUNTRIES.filter(c => c.code.toLowerCase().includes(s) || c.name.toLowerCase().includes(s));
+                    return this.dd.countries.filter(c => c.code.toLowerCase().includes(s) || c.name.toLowerCase().includes(s));
                 },
 
                 getFlag(code) {
-                    const c = COUNTRIES.find(x => x.code === code);
+                    if (!code) return '🏳️';
+                    const s = code.toUpperCase();
+                    const c = this.dd.countries.find(x => x.code === s);
                     return c ? c.flag : '🏳️';
                 },
 
                 getKernelsForOs(os) {
-                    return KERNEL_MAP[os] || ['6.1.0-18-amd64'];
+                    return this.dd.kernelMap[os] || [];
                 },
 
                 onOsChange() {
@@ -620,19 +964,28 @@
 
                 init() {
                     if (this.token) {
-                        // 验证 Token 有效性
-                        fetch('/api/nodes', { headers: { 'Authorization': 'Bearer ' + this.token } })
-                            .then(r => {
-                                if (r.status === 401 || r.status === 403) this.logout();
-                                else {
-                                    r.json().then(d => this.nodes = d);
-                                    this.start();
-                                }
-                            })
-                            .catch(() => this.logout());
+                        this.validateToken();
+                        this.loadNodes();
+                        this.loadTemplates();
+                        setInterval(() => { this.loadNodes(); this.loadTemplates(); }, 3000);
                     }
-                    fetch('/api/presets').then(r => r.json()).then(d => this.presets = d).catch(() => { });
                 },
+
+                async validateToken() {
+                    fetch('/api/nodes', { headers: { 'Authorization': 'Bearer ' + this.token } })
+                        .then(r => { if (r.status === 401 || r.status === 403) this.logout(); })
+                        .catch(() => this.logout());
+                },
+
+                formatTraffic(bytes) {
+                    if (!bytes) return '0 B';
+                    const k = 1024;
+                    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                },
+
+
 
                 async login() {
                     try {
@@ -651,9 +1004,13 @@
                 logout() { this.token = ''; localStorage.removeItem('vkomari_token'); this.nodes = []; },
 
                 async changePassword() {
-                    if (this.newPassword.length < 6) return alert('密码至少6位');
+                    if (this.newPassword.length < 6) return this.notify('密码至少6位', 'error');
                     const r = await this.api('/api/change-password', 'POST', { newPassword: this.newPassword });
-                    if (r && r.success) { alert('修改成功'); this.showPwdModal = false; }
+                    if (r && r.success) {
+                        this.notify('密码修改成功', 'success');
+                        this.showPwdModal = false;
+                        this.newPassword = '';
+                    }
                 },
 
                 async api(url, method = 'GET', body = null) {
@@ -671,12 +1028,14 @@
                 async loadNodes() { if (this.token) { const d = await this.api('/api/nodes'); if (d) this.nodes = d; } },
 
                 openModal() {
-                    const p = this.presets.low || {};
+                    const p = this.dd.loadPresets.low || {};
                     this.form = {
                         name: 'Node-' + (this.nodes.length + 1), server_address: '', client_secret: '',
                         cpu_model: 'Intel Xeon E5-2690 v4', cpu_cores: 2, ram_total: 2048, swap_total: 512, disk_total: 20480,
                         os: 'Debian GNU/Linux 12 (bookworm)', arch: 'amd64', virtualization: 'kvm', region: 'CN',
+                        group_name: '',
                         kernel_version: '6.1.0-18-amd64', load_profile: 'low', report_interval: 1, enabled: 1,
+                        uptime_base: 0, boot_date: '', traffic_reset_day: 1, fake_ip: '',
                         // 单位控制
                         ram_unit: 'MB', swap_unit: 'MB', disk_unit: 'MB', net_unit: 'Bytes',
                         // 启动时间
@@ -688,11 +1047,53 @@
                         proc_min: p.proc_min, proc_max: p.proc_max
                     };
                     this.countrySearch = '中国';
+                    this.generateIpForRegion('CN');
                     this.showModal = true;
+                },
+
+                async loadTemplates() {
+                    const d = await this.api('/api/templates');
+                    if (d) this.templates = d;
+                },
+
+                async saveAsTemplate() {
+                    if (!this.newTemplateName) return this.notify('请输入模板名称', 'warning');
+                    const payload = { ...this.form };
+                    delete payload.id; delete payload.name; delete payload.server_address; delete payload.client_secret;
+                    await this.api('/api/templates', 'POST', { name: this.newTemplateName, config: payload });
+                    this.newTemplateName = '';
+                    this.loadTemplates();
+                    this.notify('模板保存成功', 'success');
+                },
+
+                applyTemplate(t) {
+                    const name = this.form.name;
+                    const addr = this.form.server_address;
+                    const secret = this.form.client_secret;
+                    const id = this.form.id;
+                    const uuid = this.form.client_uuid;
+                    this.form = { ...t.config, name, server_address: addr, client_secret: secret, id, client_uuid: uuid };
+                    const c = this.dd.countries.find(x => x.code === this.form.region);
+                    this.countrySearch = c ? c.name : this.form.region;
+                },
+
+                async deleteTemplate(id) {
+                    if (!(await this.showConfirm('删除模板', '确定要删除这个模板吗？', 'danger', '立即删除'))) return;
+                    await this.api('/api/templates/delete', 'POST', { id });
+                    this.loadTemplates();
+                    this.notify('模板已删除', 'success');
                 },
 
                 editNode(n) {
                     this.form = { ...n };
+                    if (typeof this.form.uptime_base === 'undefined') this.form.uptime_base = 0;
+                    if (this.form.uptime_base > 0) {
+                        this.form.boot_date = new Date(Date.now() - this.form.uptime_base * 1000).toISOString().slice(0, 10);
+                    } else {
+                        this.form.boot_date = '';
+                    }
+                    if (typeof this.form.traffic_reset_day === 'undefined') this.form.traffic_reset_day = 1;
+
                     // 初始化硬件单位
                     this.form.ram_unit = 'MB'; this.form.swap_unit = 'MB'; this.form.disk_unit = 'MB';
                     if (this.form.ram_total >= 1024 && this.form.ram_total % 1024 === 0) { this.form.ram_total /= 1024; this.form.ram_unit = 'GB'; }
@@ -715,13 +1116,13 @@
                         this.form.boot_time_date = '';
                     }
 
-                    const c = COUNTRIES.find(x => x.code === n.region);
+                    const c = this.dd.countries.find(x => x.code === n.region);
                     this.countrySearch = c ? c.name : n.region;
                     this.showModal = true;
                 },
 
                 applyPreset() {
-                    const p = this.presets[this.form.load_profile];
+                    const p = this.dd.loadPresets[this.form.load_profile];
                     if (p) {
                         const keys = ['cpu_min', 'cpu_max', 'mem_min', 'mem_max', 'swap_min', 'swap_max', 'disk_min', 'disk_max', 'conn_min', 'conn_max', 'proc_min', 'proc_max'];
                         keys.forEach(k => this.form[k] = p[k]);
@@ -738,17 +1139,28 @@
                     const u = this.form.net_unit;
                     let next = u === 'Bytes' ? 'KB' : (u === 'KB' ? 'MB' : 'Bytes');
 
-                    // 转换数值
-                    if (u === 'Bytes' && next === 'KB') { this.form.net_min /= 1024; this.form.net_max /= 1024; }
-                    else if (u === 'KB' && next === 'MB') { this.form.net_min /= 1024; this.form.net_max /= 1024; }
-                    else if (u === 'MB' && next === 'Bytes') { this.form.net_min *= 1048576; this.form.net_max *= 1048576; }
-                    else if (u === 'KB' && next === 'Bytes') { this.form.net_min *= 1024; this.form.net_max *= 1024; }
+                    if (u === 'Bytes' && next === 'KB') { this.form.net_min = parseFloat((this.form.net_min / 1024).toFixed(3)); this.form.net_max = parseFloat((this.form.net_max / 1024).toFixed(3)); }
+                    else if (u === 'KB' && next === 'MB') { this.form.net_min = parseFloat((this.form.net_min / 1024).toFixed(3)); this.form.net_max = parseFloat((this.form.net_max / 1024).toFixed(3)); }
+                    else if (u === 'MB' && next === 'Bytes') { this.form.net_min = Math.round(this.form.net_min * 1048576); this.form.net_max = Math.round(this.form.net_max * 1048576); }
+                    else if (u === 'KB' && next === 'Bytes') { this.form.net_min = Math.round(this.form.net_min * 1024); this.form.net_max = Math.round(this.form.net_max * 1024); }
 
                     this.form.net_unit = next;
                 },
 
+                toggleUnit(type) {
+                    const field = type + '_total';
+                    const unitField = type + '_unit';
+                    if (this.form[unitField] === 'MB') {
+                        this.form[field] = parseFloat((this.form[field] / 1024).toFixed(2));
+                        this.form[unitField] = 'GB';
+                    } else {
+                        this.form[field] = Math.round(this.form[field] * 1024);
+                        this.form[unitField] = 'MB';
+                    }
+                },
+
                 async saveNode() {
-                    if (!this.form.name || !this.form.server_address) return alert('请填写名称和地址');
+                    if (!this.form.name || !this.form.server_address) return this.notify('请填写名称和地址', 'warning');
                     this.form.server_address = this.form.server_address.replace(/\/+$/, ''); // 去除尾部斜杠
 
                     // 克隆表单对象以避免修改显示值
@@ -763,9 +1175,11 @@
                     if (this.form.net_unit === 'KB') { payload.net_min *= 1024; payload.net_max *= 1024; }
                     else if (this.form.net_unit === 'MB') { payload.net_min *= 1048576; payload.net_max *= 1048576; }
 
-                    // 处理启动时间日期
-                    if (this.form.boot_time_date) {
-                        payload.boot_time = Math.floor(new Date(this.form.boot_time_date).getTime() / 1000);
+                    // 处理启动时间
+                    if (this.form.boot_date) {
+                        payload.uptime_base = Math.floor((Date.now() - new Date(this.form.boot_date).getTime()) / 1000);
+                    } else {
+                        payload.uptime_base = 0; // 让后端随机生成
                     }
 
                     await this.api('/api/nodes', 'POST', payload);
@@ -776,15 +1190,90 @@
                 async toggleNode(id, enabled) { await this.api('/api/toggle', 'POST', { id, enabled }); this.loadNodes(); },
 
                 async batchAction(action) {
-                    if (!confirm(action === 'start' ? '启动全部?' : '停止全部?')) return;
+                    const isStart = action === 'start';
+                    if (!(await this.showConfirm(
+                        isStart ? '启动全部' : '停止全部',
+                        isStart ? '确定要启动所有已启用的节点吗？' : '确定要停止所有正在运行的节点吗？',
+                        isStart ? 'info' : 'danger',
+                        isStart ? '全部启动' : '全部停止'
+                    ))) return;
                     await this.api('/api/batch', 'POST', { action });
                     this.loadNodes();
+                    this.notify(isStart ? '启动指令已发送' : '停止指令已发送', 'info');
+                },
+
+                // cloneNode(id) {
+                //     // Functionality removed per request
+                // },
+
+                exportNodes() {
+                    const data = JSON.stringify({ nodes: this.nodes }, null, 2);
+                    const blob = new Blob([data], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `vkomari_export_${new Date().toISOString().slice(0, 10)}.json`;
+                    a.click();
+                },
+
+                async importNodes(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        try {
+                            const data = JSON.parse(event.target.result);
+                            if (data.nodes) {
+                                await this.api('/api/import', 'POST', { nodes: data.nodes });
+                                this.loadNodes();
+                                this.notify('导入成功', 'success');
+                            }
+                        } catch (err) { this.showAlert('导入失败', err.message, 'error'); }
+                    };
+                    reader.readAsText(file);
+                    e.target.value = '';
                 },
 
                 async deleteNode(id) {
-                    if (!confirm('确定删除?')) return;
+                    if (!(await this.showConfirm('删除节点', '确定要删除这个节点吗？此操作不可撤销。', 'danger', '立即删除'))) return;
                     await this.api('/api/delete', 'POST', { id });
                     this.loadNodes();
+                    this.notify('节点已删除', 'success');
+                },
+
+                generateIpForRegion(code) {
+                    const cidr = this.dd.ipRanges[code];
+                    if (cidr) {
+                        this.form.fake_ip = this.cidrToIp(cidr);
+                    }
+                },
+
+                cidrToIp(cidr) {
+                    const [range, maskStr] = cidr.split('/');
+                    const mask = parseInt(maskStr);
+                    const ips = range.split('.').map(Number);
+
+                    // 将 IP 转换为 32 位整数
+                    let ipInt = (ips[0] << 24) | (ips[1] << 16) | (ips[2] << 8) | ips[3];
+
+                    // 计算可变部分的位数
+                    const bits = 32 - mask;
+                    const maxOffset = Math.pow(2, bits) - 1;
+
+                    // 随机生成一个偏移量（避免生成网络地址 .0 或广播地址 .255）
+                    let offset = Math.floor(Math.random() * maxOffset);
+                    if (bits > 8 && (offset & 0xFF) === 0) offset += 1;
+                    if (bits > 8 && (offset & 0xFF) === 255) offset -= 1;
+
+                    const finalIpInt = (ipInt & (~maxOffset)) | offset;
+
+                    // 转回字符串
+                    return [
+                        (finalIpInt >>> 24) & 0xFF,
+                        (finalIpInt >>> 16) & 0xFF,
+                        (finalIpInt >>> 8) & 0xFF,
+                        finalIpInt & 0xFF
+                    ].join('.');
                 }
             }
         }
