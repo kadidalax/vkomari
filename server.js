@@ -1,83 +1,47 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+// Removed sqlite3 - using lightweight JSON storage
 const WebSocket = require('ws');
 const nodePath = require('path');
-const cors = require('cors');
 const fs = require('fs');
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
 const https = require('https');
 const http = require('http');
 
-var IP_PREFIXES = {
-    'CN': ['116.198.', '121.40.', '47.94.', '39.108.'],
-    'HK': ['103.152.', '45.125.', '156.251.', '103.117.'],
-    'TW': ['61.216.', '114.34.', '118.163.', '211.72.'],
-    'MO': ['122.100.', '60.246.', '202.175.'],
-    'JP': ['45.76.', '139.162.', '150.95.', '160.16.'],
-    'SG': ['128.199.', '159.89.', '206.189.', '8.219.'],
-    'KR': ['121.78.', '211.234.', '125.141.', '222.122.'],
-    'US': ['104.238.', '45.63.', '66.42.', '149.28.'],
-    'DE': ['5.189.', '78.46.', '88.99.', '116.202.'],
-    'GB': ['51.15.', '178.62.', '139.59.', '167.71.'],
-    'NL': ['45.63.', '95.179.', '136.244.', '185.216.'],
-    'FR': ['51.158.', '163.172.', '62.210.', '54.37.'],
-    'RU': ['45.141.', '185.22.', '91.218.', '46.17.'],
-    'CA': ['149.56.', '158.69.', '192.99.', '51.79.'],
-    'AU': ['103.16.', '45.121.', '139.99.', '168.138.'],
-    'IN': ['103.21.', '139.59.', '143.110.', '68.183.'],
-    'BR': ['177.54.', '191.96.', '45.174.', '168.227.'],
-    'TH': ['103.253.', '171.97.', '49.228.', '182.52.'],
-    'VN': ['103.97.', '171.244.', '14.225.', '42.112.'],
-    'MY': ['103.106.', '175.139.', '60.54.', '103.86.'],
-    'ID': ['103.28.', '36.92.', '114.4.', '103.10.'],
-    'PH': ['103.78.', '112.198.', '49.145.', '103.225.'],
-    'AR': ['181.47.', '190.2.', '200.55.', '45.170.'],
-    'MX': ['187.188.', '189.203.', '201.163.', '200.68.'],
-    'ZA': ['102.165.', '154.0.', '196.216.', '105.224.'],
-    'TR': ['185.193.', '31.145.', '78.186.', '176.33.'],
-    'AE': ['94.200.', '185.176.', '86.96.', '185.23.'],
-    'SA': ['188.247.', '185.70.', '95.177.', '185.117.'],
-    'IT': ['151.38.', '79.2.', '93.35.', '5.90.'],
-    'ES': ['88.27.', '95.127.', '185.253.', '37.223.'],
-    'PT': ['188.37.', '85.243.', '94.63.', '5.249.'],
-    'PL': ['185.243.', '91.232.', '5.184.', '37.47.'],
-    'SE': ['185.213.', '45.83.', '194.68.', '31.211.'],
-    'NO': ['185.35.', '91.189.', '178.164.', '193.90.'],
-    'FI': ['185.31.', '95.175.', '91.152.', '193.64.'],
-    'DK': ['185.206.', '91.198.', '185.129.', '193.163.'],
-    'CH': ['185.181.', '178.197.', '31.164.', '146.0.'],
-    'AT': ['185.216.', '78.142.', '91.118.', '185.101.'],
-    'BE': ['185.232.', '91.183.', '178.51.', '193.191.'],
-    'IE': ['185.107.', '87.44.', '92.251.', '193.1.'],
-    'CZ': ['185.8.', '89.221.', '46.174.', '193.86.'],
-    'RO': ['185.225.', '89.40.', '86.105.', '193.226.'],
-    'HU': ['185.33.', '89.134.', '84.0.', '193.225.'],
-    'GR': ['185.4.', '94.66.', '79.166.', '193.92.'],
-    'UA': ['185.65.', '91.194.', '176.36.', '193.19.'],
-    'KZ': ['185.125.', '95.56.', '178.89.', '2.132.'],
-    'NZ': ['103.197.', '125.236.', '49.50.', '202.36.'],
-    'CL': ['185.112.', '190.107.', '200.54.', '152.172.']
+// 原生轻量化 JWT 实现，减少依赖
+const jwt = {
+    sign: (payload, secret, options = {}) => {
+        const header = { alg: 'HS256', typ: 'JWT' };
+        if (options.expiresIn) {
+            const match = options.expiresIn.match(/^(\d+)h$/);
+            if (match) payload.exp = Math.floor(Date.now() / 1000) + (parseInt(match[1]) * 3600);
+        }
+        const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+        const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+        const signature = crypto.createHmac('sha256', secret)
+            .update(encodedHeader + '.' + encodedPayload)
+            .digest('base64url');
+        return `${encodedHeader}.${encodedPayload}.${signature}`;
+    },
+    verify: (token, secret, callback) => {
+        try {
+            const parts = token.split('.');
+            if (parts.length !== 3) return callback(new Error('Invalid token'));
+            const [header, payload, signature] = parts;
+            const expectedSignature = crypto.createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
+            if (signature !== expectedSignature) return callback(new Error('Invalid signature'));
+            const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
+            if (decoded.exp && decoded.exp < Date.now() / 1000) return callback(new Error('Expired'));
+            callback(null, decoded);
+        } catch (e) { callback(e); }
+    }
 };
 
-function generateFakeIP(region) {
-    var prefixes = IP_PREFIXES[region] || IP_PREFIXES['US'];
-    var prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    var third = Math.floor(Math.random() * 256);
-    var fourth = Math.floor(Math.random() * 254) + 1;
-    return prefix + third + '.' + fourth;
-}
 
-// ISO 国家代码转 emoji 旗帜
-function isoToEmoji(code) {
-    if (!code || code.length !== 2) return '🏳️';
-    return String.fromCodePoint(
-        ...code.toUpperCase().split('').map(function(c) { return 0x1F1E6 + c.charCodeAt(0) - 65; })
-    );
-}
 
-var PORT = 4000;
-var DB_PATH = process.env.DB_PATH || nodePath.join(__dirname, 'data', 'database.sqlite');
+
+
+var PORT = 25770;
+var DB_PATH = process.env.DB_PATH || nodePath.join(__dirname, 'data', 'db.json');
 var JWT_SECRET = process.env.JWT_SECRET || 'vkomari-secret-key-2026';
 var LOGIN_ATTEMPTS = new Map();
 var LOCKOUT_TIME = 300000;
@@ -85,33 +49,121 @@ var LOCKOUT_TIME = 300000;
 var dbDir = nodePath.dirname(DB_PATH);
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
+// --- 轻量级 JSON 数据库实现 ---
+const dbStore = {
+    groups: [],
+    nodes: [],
+    users: [],
+    templates: []
+};
+
+// 持久化到文件
+function saveDB() {
+    try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(dbStore, null, 2));
+    } catch (e) { console.error('[DB] Save Error:', e); }
+}
+
+// 从文件加载
+function loadDBFromFile() {
+    if (fs.existsSync(DB_PATH)) {
+        try {
+            const content = fs.readFileSync(DB_PATH, 'utf-8');
+            Object.assign(dbStore, JSON.parse(content));
+        } catch (e) { console.error('[DB] Load Error:', e); }
+    }
+}
+loadDBFromFile();
+
+// 模拟 SQLite API 以减少业务逻辑改动
+const db = {
+    serialize: (fn) => fn(),
+    run: function (sql, params, cb) {
+        if (typeof params === 'function') { cb = params; params = []; }
+
+        // 简单的路由模拟
+        if (sql.includes('INSERT INTO users')) {
+            const [username, password, salt] = params;
+            dbStore.users.push({ id: Date.now(), username, password, salt });
+        } else if (sql.includes('UPDATE users SET password=?, salt=?')) {
+            if (dbStore.users.length > 0) {
+                dbStore.users[0].password = params[0];
+                dbStore.users[0].salt = params[1];
+            }
+        } else if (sql.includes('UPDATE nodes SET enabled=? WHERE id=?')) {
+            const node = dbStore.nodes.find(n => n.id === params[1]);
+            if (node) node.enabled = params[0];
+        } else if (sql.includes('UPDATE nodes SET enabled=?')) {
+            dbStore.nodes.forEach(n => n.enabled = params[0]);
+        } else if (sql.includes('UPDATE nodes SET')) {
+            const id = params[params.length - 1];
+            const nodeIdx = dbStore.nodes.findIndex(n => n.id === id);
+            if (nodeIdx !== -1) {
+                const setMatches = sql.match(/SET (.*?) WHERE/);
+                if (setMatches) {
+                    const keys = setMatches[1].split(',').map(s => s.split('=')[0].trim());
+                    keys.forEach((k, i) => dbStore.nodes[nodeIdx][k] = params[i]);
+                }
+            }
+        } else if (sql.includes('INSERT INTO nodes')) {
+            const keys = sql.match(/\((.*?)\)/)[1].split(',').map(s => s.trim());
+            const newNode = { id: Date.now() };
+            keys.forEach((k, i) => newNode[k] = params[i]);
+            dbStore.nodes.push(newNode);
+            if (cb) cb.call({ lastID: newNode.id });
+            saveDB(); return;
+        } else if (sql.includes('DELETE FROM nodes')) {
+            const id = params[0];
+            dbStore.nodes = dbStore.nodes.filter(n => n.id !== id);
+        } else if (sql.includes('INSERT INTO templates')) {
+            const [name, config] = params;
+            const newTpl = { id: Date.now(), name, config };
+            dbStore.templates.push(newTpl);
+            if (cb) cb.call({ lastID: newTpl.id });
+            saveDB(); return;
+        } else if (sql.includes('DELETE FROM templates')) {
+            dbStore.templates = dbStore.templates.filter(t => t.id !== params[0]);
+        }
+
+        saveDB();
+        if (cb) cb(null);
+    },
+    get: function (sql, params, cb) {
+        if (typeof params === 'function') { cb = params; params = []; }
+        let result = null;
+        if (sql.includes('FROM users WHERE username=?')) {
+            result = dbStore.users.find(u => u.username === params[0]);
+        }
+        if (cb) cb(null, result);
+    },
+    all: function (sql, params, cb) {
+        if (typeof params === 'function') { cb = params; params = []; }
+        let results = [];
+        if (sql.includes('FROM nodes')) {
+            results = JSON.parse(JSON.stringify(dbStore.nodes)); // 深拷贝
+            if (sql.includes('ORDER BY id DESC')) results.sort((a, b) => b.id - a.id);
+        } else if (sql.includes('FROM templates')) {
+            results = JSON.parse(JSON.stringify(dbStore.templates));
+            if (sql.includes('ORDER BY id DESC')) results.sort((a, b) => b.id - a.id);
+        }
+        if (cb) cb(null, results);
+    }
+};
+
+// 初始化默认用户 (如果不存在)
+if (dbStore.users.length === 0) {
+    var salt = crypto.randomBytes(16).toString('hex');
+    var hash = crypto.pbkdf2Sync('vkomari', salt, 10000, 64, 'sha512').toString('hex');
+    dbStore.users.push({ id: 1, username: 'admin', password: hash, salt: salt });
+    saveDB();
+    console.log('[vKomari] Default admin created (user: admin, pass: vkomari).');
+}
+
 var app = express();
 app.use(express.json({ limit: '1mb' }));
-app.use(cors());
 app.use(express.static(nodePath.join(__dirname, 'public')));
 
-var db = new sqlite3.Database(DB_PATH);
 
-db.serialize(function () {
-    db.run('CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, server_address TEXT, client_secret TEXT, client_uuid TEXT, cpu_model TEXT, cpu_cores INTEGER, ram_total INTEGER, swap_total INTEGER, disk_total INTEGER, os TEXT, arch TEXT, virtualization TEXT, region TEXT, kernel_version TEXT, load_profile TEXT, cpu_min REAL, cpu_max REAL, mem_min REAL, mem_max REAL, swap_min REAL, swap_max REAL, disk_min REAL, disk_max REAL, net_min INTEGER, net_max INTEGER, conn_min INTEGER, conn_max INTEGER, proc_min INTEGER, proc_max INTEGER, report_interval INTEGER DEFAULT 1, enabled INTEGER DEFAULT 1, boot_time INTEGER DEFAULT 0, fake_ip TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)');
-
-    db.all('PRAGMA table_info(nodes)', function (err, rows) {
-        if (rows && !rows.some(function (c) { return c.name === 'fake_ip'; })) {
-            db.run('ALTER TABLE nodes ADD COLUMN fake_ip TEXT');
-        }
-    });
-
-    db.run('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, salt TEXT)', [], function () {
-        db.get('SELECT * FROM users WHERE username=?', ['admin'], function (e, r) {
-            if (!r) {
-                var salt = crypto.randomBytes(16).toString('hex');
-                var hash = crypto.pbkdf2Sync('vkomari', salt, 10000, 64, 'sha512').toString('hex');
-                db.run('INSERT INTO users (username,password,salt) VALUES (?,?,?)', ['admin', hash, salt]);
-                console.log('[vKomari] Default admin created (user: admin, pass: vkomari).');
-            }
-        });
-    });
-});
 
 function hashPwd(p, s) {
     s = s || crypto.randomBytes(16).toString('hex');
@@ -144,9 +196,9 @@ var activeAgents = new Map();
 
 function Agent(config) {
     this.config = config;
-    this.ws = null;
-    this.timers = { heartbeat: null, info: null, reconnect: null };
-    this.state = { connected: false, sendCount: 0, totalUp: 0, totalDown: 0, lastError: '' };
+    this.connections = []; // 存储多个连接对象 {ws, timers, state, addr}
+    this.state = { sendCount: 0, totalUp: 0, totalDown: 0 };
+    this.simTimer = null;
 
     // 确保配置值有效
     var cpu_min = Number(config.cpu_min) || 0.5;
@@ -158,18 +210,82 @@ function Agent(config) {
     var disk_min = Number(config.disk_min) || 10.0;
     var disk_max = Number(config.disk_max) || 10.5;
 
+    // 真实性模拟状态 (初始化 - 增加随机偏移，防止多个节点数据雷同)
+    var rawRamTotal = Number(config.ram_total) || 1024;
+    var rawDiskTotal = Number(config.disk_total) || 10240;
+
+    // 模拟硬件/内核预留: 实际显示的 Total 往往比配置的小 1%-3%
+    // 例如 1024MB 实际显示 986MB, 10GB 实际显示 9.6GB
+    this.ram_actual = Math.floor(rawRamTotal * (0.96 + Math.random() * 0.02));
+    this.disk_actual = parseFloat((rawDiskTotal * (0.94 + Math.random() * 0.03)).toFixed(1));
+
+    var ramTotalMB = this.ram_actual;
+    // 模拟 Linux 系统基础开销: 小内存比例更高
+    var systemBaseMB = ramTotalMB <= 512 ? (ramTotalMB * 0.4) : (150 + ramTotalMB * 0.1);
+    var systemBasePct = (systemBaseMB / ramTotalMB) * 100;
+
+    // 磁盘基础开销模拟 (OS 占用)
+    var diskTotalMB = this.disk_actual * 1024; // 这里的 config.disk_total 是 GB
+    var osDiskMB = diskTotalMB <= 2048 ? (diskTotalMB * 0.65) : (800 + diskTotalMB * 0.03);
+    var osDiskPct = (osDiskMB / diskTotalMB) * 100;
+
+    // 初始值在配置的 min 基础上增加随机偏移
+    var initialCpu = cpu_min + (Math.random() * (cpu_max - cpu_min) * 0.2);
+    var initialMem = Math.max(mem_min, systemBasePct) + (Math.random() * 2);
+    var initialDisk = Math.max(disk_min, osDiskPct) + (Math.random() * 0.5);
+
     this.sim = {
-        cpu: this.randFloat(cpu_min, cpu_max),
-        mem: this.randFloat(mem_min, mem_max),
-        swap: this.randFloat(swap_min, swap_max),
-        disk: this.randFloat(disk_min, disk_max),
-        conn: this.rand(Number(config.conn_min) || 2, Number(config.conn_max) || 10),
-        proc: this.rand(Number(config.proc_min) || 40, Number(config.proc_max) || 60)
+        cpu: parseFloat(initialCpu.toFixed(1)),
+        cpuBurstLevel: 0,
+        cpuBurstDecay: 0,
+
+        mem: parseFloat(initialMem.toFixed(1)),
+        memLeakAccum: Math.random() * 0.5, // 初始缓存累积随机
+
+        swap: parseFloat(swap_min.toFixed(1)),
+        disk: parseFloat(initialDisk.toFixed(1)),
+
+        conn: Math.round((Number(config.conn_min) || 50) + (Math.random() * 10)),
+        proc: Math.round((Number(config.proc_min) || 100) + (Math.random() * 5)),
+
+        gpu: 0,
+        tickCount: Math.floor(Math.random() * 1000) // 随机初始 tick，使不同节点的正弦波周期错开
     };
-    this.bootTime = config.boot_time > 0 ? config.boot_time : Math.floor(Date.now() / 1000) - 86400 * this.rand(1, 30);
+
+    // 随机初始流量，避免新节点流量全是 0
+    this.state = {
+        sendCount: 0,
+        totalUp: Math.floor(Math.random() * 50 * 1024 * 1024), // 0-50MB 初始流量
+        totalDown: Math.floor(Math.random() * 200 * 1024 * 1024) // 0-200MB 初始流量
+    };
+
+    this.startTime = Date.now();
+    this.uptimeBase = Number(config.uptime_base) || 0;
     this.uuid = config.client_uuid || crypto.randomUUID();
+
+    // 硬件指纹：计算真实的可用值（非整数，模拟系统预留和文件系统开销）
+    this.calculateUsableHardware();
+
     this.shouldReconnect = false;
 }
+
+Agent.prototype.calculateUsableHardware = function () {
+    var c = this.config;
+    var ramTotalMB = Number(c.ram_total) || 1024;
+    var diskTotalMB = Number(c.disk_total) || 10240;
+    var swapTotalMB = Number(c.swap_total) || 0;
+
+    // RAM 损耗: 94% - 98% 可用
+    var ramFactor = 0.94 + (Math.random() * 0.04);
+    // Disk 损耗: 91% - 95% 可用 (包含二进制转换和 FS 开销)
+    var diskFactor = 0.91 + (Math.random() * 0.04);
+
+    this.usable = {
+        ram: Math.floor(ramTotalMB * ramFactor * 1048576),
+        disk: Math.floor(diskTotalMB * diskFactor * 1048576),
+        swap: Math.floor(swapTotalMB * 0.995 * 1048576) // Swap 损耗极小
+    };
+};
 
 Agent.prototype.rand = function (min, max) {
     min = Number(min) || 0; max = Number(max) || 0;
@@ -183,204 +299,403 @@ Agent.prototype.randFloat = function (min, max) {
     return Math.random() * (max - min) + min;
 };
 
-// 增强的波动算法：随机游走 + 噪声
-Agent.prototype.fluctuate = function (current, min, max, volatility) {
-    min = Number(min) || 0;
-    max = Number(max) || 0;
-    current = Number(current) || min;
-
-    if (min > max) { var t = min; min = max; max = t; }
-    if (min === max) return min;
-
-    var range = max - min;
-    var step = range * 0.05 * (Math.random() - 0.5); // 减小步长
-    var next = current + step;
-    return Math.max(min, Math.min(max, next));
-};
-
 Agent.prototype.start = function () {
     if (!this.config.enabled) return;
     this.shouldReconnect = true;
+    this.startSim();
     this.connect();
 };
 
 Agent.prototype.stop = function () {
     this.shouldReconnect = false;
-    if (this.timers.heartbeat) clearInterval(this.timers.heartbeat);
-    if (this.timers.info) clearInterval(this.timers.info);
-    if (this.timers.reconnect) clearTimeout(this.timers.reconnect);
-    if (this.ws) { try { this.ws.close(); this.ws.terminate(); } catch (e) { } this.ws = null; }
-    this.state.connected = false;
+    if (this.simTimer) clearInterval(this.simTimer);
+    this.simTimer = null;
+    this.connections.forEach(function (c) {
+        if (c.timers.heartbeat) clearInterval(c.timers.heartbeat);
+        if (c.timers.info) clearInterval(c.timers.info);
+        if (c.timers.reconnect) clearTimeout(c.timers.reconnect);
+        if (c.ws) { try { c.ws.close(); c.ws.terminate(); } catch (e) { } }
+    });
+    this.connections = [];
 };
 
 Agent.prototype.update = function (newConfig) {
+    var self = this;
     var wasEnabled = !!this.config.enabled;
     var needsRestart = this.config.server_address !== newConfig.server_address || this.config.client_secret !== newConfig.client_secret;
+
+    // 检查规格或上报配置变更
+    var specFields = ['name', 'cpu_model', 'cpu_cores', 'ram_total', 'swap_total', 'disk_total', 'os', 'arch', 'virtualization', 'region', 'kernel_version', 'gpu_name', 'fake_ip', 'ipv6'];
+    var specChanged = specFields.some(function (f) { return String(self.config[f]) !== String(newConfig[f]); });
+
     this.config = newConfig;
 
-    // 重置模拟状态到新的范围内
-    this.sim.cpu = this.randFloat(newConfig.cpu_min, newConfig.cpu_max);
-    this.sim.mem = this.randFloat(newConfig.mem_min, newConfig.mem_max);
-    this.sim.swap = this.randFloat(newConfig.swap_min, newConfig.swap_max);
-    this.sim.disk = this.randFloat(newConfig.disk_min, newConfig.disk_max);
-    this.sim.conn = this.rand(newConfig.conn_min, newConfig.conn_max);
-    this.sim.proc = this.rand(newConfig.proc_min, newConfig.proc_max);
+    // 立即生效：重置模拟状态配置 (引入随机性以区分不同节点)
+    var ramTotalMB = Number(newConfig.ram_total) || 1024;
+    var systemBaseMB = ramTotalMB <= 512 ? (ramTotalMB * 0.4) : (150 + ramTotalMB * 0.1);
+    var systemBasePct = (systemBaseMB / ramTotalMB) * 100;
 
-    if (newConfig.boot_time > 0) this.bootTime = newConfig.boot_time;
-    if (!newConfig.enabled) this.stop();
-    else if (!wasEnabled || needsRestart) { this.stop(); this.start(); }
+    // 磁盘基础开销
+    var diskTotalMB = Number(newConfig.disk_total) || 10240;
+    var osDiskMB = diskTotalMB <= 2048 ? (diskTotalMB * 0.65) : (800 + diskTotalMB * 0.03);
+    var osDiskPct = (osDiskMB / diskTotalMB) * 100;
+
+    var cMin = Number(newConfig.cpu_min) || 0;
+    var cMax = Number(newConfig.cpu_max) || (cMin + 5);
+    var mMin = Number(newConfig.mem_min) || 0;
+    var dMin = Number(newConfig.disk_min) || 0;
+
+    this.sim.cpu = parseFloat((cMin + (Math.random() * (cMax - cMin) * 0.2)).toFixed(1));
+    this.sim.cpuBurstLevel = 0;
+    this.sim.cpuBurstDecay = 0;
+    this.sim.mem = parseFloat((Math.max(mMin, systemBasePct) + (Math.random() * 2)).toFixed(1));
+    this.sim.memLeakAccum = Math.random() * 0.2;
+    this.sim.swap = parseFloat((Number(newConfig.swap_min) || 0).toFixed(1));
+    this.sim.disk = parseFloat((Math.max(dMin, osDiskPct) + (Math.random() * 0.2)).toFixed(1));
+    this.sim.conn = Math.round((Number(newConfig.conn_min) || 50) + (Math.random() * 5));
+    this.sim.proc = Math.round((Number(newConfig.proc_min) || 100) + (Math.random() * 3));
+    this.sim.tickCount = Math.floor(Math.random() * 1000); // 重置时也随机化 tick，错开周期
+    this.uptimeBase = Number(newConfig.uptime_base) || 0;
+    this.startTime = Date.now();
+
+    // 重新计算硬件指纹（如果规格变了）
+    this.calculateUsableHardware();
+
+    if (!newConfig.enabled) {
+        this.stop();
+    } else if (!wasEnabled || needsRestart) {
+        this.stop();
+        this.start();
+    } else {
+        //核心逻辑：如果连接没断，立即强制推送所有信息
+        this.connections.forEach(function (c) {
+            if (c.online) {
+                if (specChanged) self.uploadInfo(c); // 如果硬件规格变了，先推静态信息
+                self.sendToConn(c); // 无论如何，立即推一次实时数据
+            }
+        });
+
+        // 重新启动模拟计时器和连接计时器以匹配新的 interval
+        this.startSim(); // 这会按照新的 interval 重新开始循环
+    }
 };
 
 Agent.prototype.connect = function () {
     var self = this;
-    if (!this.shouldReconnect || (this.ws && this.ws.readyState === WebSocket.OPEN)) return;
-    var addr = (this.config.server_address || '').trim().replace(/\/+$/, '');
-    if (!addr) return;
+    if (!this.shouldReconnect) return;
+
+    var addrs = (this.config.server_address || '').split(/[,，\s]+/).map(s => s.trim()).filter(Boolean);
+
+    addrs.forEach(function (rawAddr) {
+        if (self.connections.some(c => c.rawAddr === rawAddr)) return;
+
+        var addr = rawAddr.replace(/\/+$/, '');
+        if (!/^(ws|http)s?:\/\//.test(addr)) addr = 'wss://' + addr;
+        var wsUrl = addr.replace(/^http/, 'ws') + '/api/clients/report?token=' + encodeURIComponent(self.config.client_secret);
+        var httpUrl = addr.replace(/^ws/, 'http');
+
+        var conn = {
+            rawAddr: rawAddr,
+            baseUrl: httpUrl,
+            ws: null,
+            timers: { heartbeat: null, info: null, reconnect: null },
+            online: false,
+            lastError: ''
+        };
+        self.connections.push(conn);
+        self.establishWs(conn);
+    });
+};
+
+Agent.prototype.establishWs = function (conn) {
+    var self = this;
+    if (!this.shouldReconnect) return;
+
+    var addr = conn.rawAddr.replace(/\/+$/, '');
     if (!/^(ws|http)s?:\/\//.test(addr)) addr = 'wss://' + addr;
     var wsUrl = addr.replace(/^http/, 'ws') + '/api/clients/report?token=' + encodeURIComponent(this.config.client_secret);
-    var httpUrl = addr.replace(/^ws/, 'http');
-    console.log('[vKomari] Connecting: ' + this.config.name);
+
     try {
-        this.ws = new WebSocket(wsUrl, {
-            headers: { 'User-Agent': 'komari-agent/0.1.0', 'Origin': httpUrl },
+        conn.ws = new WebSocket(wsUrl, {
+            headers: { 'User-Agent': 'komari-agent/0.1.0', 'Origin': conn.baseUrl },
             handshakeTimeout: 10000, rejectUnauthorized: false
         });
-        this.ws.on('open', function () {
-            console.log('[vKomari] ✓ Linked: ' + self.config.name);
-            self.state.connected = true; self.state.lastError = '';
-            self.uploadInfo(httpUrl); self.startLoops(httpUrl);
+        conn.ws.on('open', function () {
+            console.log('[vKomari] ✓ Linked: ' + self.config.name + ' -> ' + conn.rawAddr);
+            conn.online = true; conn.lastError = '';
+            self.uploadInfo(conn);
+            self.startLoops(conn);
         });
-        this.ws.on('error', function (e) { self.state.lastError = e.message; self.state.connected = false; });
-        this.ws.on('close', function () {
-            self.state.connected = false; self.ws = null;
-            if (self.shouldReconnect) self.timers.reconnect = setTimeout(function () { self.connect(); }, 5000);
+        conn.ws.on('error', function (e) { conn.lastError = e.message; conn.online = false; });
+        conn.ws.on('close', function () {
+            conn.online = false; conn.ws = null;
+            if (self.shouldReconnect) conn.timers.reconnect = setTimeout(function () { self.establishWs(conn); }, 5000);
         });
     } catch (e) {
-        this.state.lastError = e.message;
-        if (this.shouldReconnect) this.timers.reconnect = setTimeout(function () { self.connect(); }, 5000);
+        conn.lastError = e.message;
+        if (self.shouldReconnect) conn.timers.reconnect = setTimeout(function () { self.establishWs(conn); }, 5000);
     }
 };
 
-Agent.prototype.uploadInfo = function (baseUrl) {
+Agent.prototype.uploadInfo = function (conn) {
     var c = this.config;
     var info = {
-        name: c.name,
         cpu_name: c.cpu_model || 'Intel Xeon',
-        virtualization: c.virtualization || 'kvm',
-        arch: c.arch || 'amd64',
         cpu_cores: parseInt(c.cpu_cores) || 2,
+        arch: c.arch || 'amd64',
         os: c.os || 'Linux',
-        gpu_name: '',
-        ipv4: c.fake_ip || '127.0.0.1',
-        region: isoToEmoji(c.region) || '🇨🇳',
-        mem_total: Math.floor((parseInt(c.ram_total) || 1024) * 1048576),
-        swap_total: Math.floor((parseInt(c.swap_total) || 0) * 1048576),
-        disk_total: Math.floor((parseInt(c.disk_total) || 10240) * 1048576),
-        version: '0.20.5'
+        virtualization: c.virtualization || 'kvm',
+        kernel_version: c.kernel_version || '',
+        gpu_name: c.gpu_name || '',
+        mem_total: this.usable.ram,
+        swap_total: this.usable.swap,
+        disk_total: this.usable.disk,
+        ipv4: c.fake_ip || 'Hidden',
+        ipv6: c.ipv6 || '',
+        region: (c.region || 'CN').toUpperCase(),
+        version: '1.2.0'
     };
 
     var self = this;
-    var path = '/api/clients/uploadBasicInfo';
-    
     try {
-        var url = new URL(baseUrl + path + '?token=' + encodeURIComponent(c.client_secret));
-        var postData = JSON.stringify(info);
-        var req = (url.protocol === 'https:' ? https : http).request({
-            hostname: url.hostname, port: url.port || (url.protocol === 'https:' ? 443 : 80),
-            path: url.pathname + url.search,
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Content-Length': Buffer.byteLength(postData),
-                'User-Agent': 'komari-agent/0.1.0'
-            },
-            rejectUnauthorized: false
-        }, function (res) {
-            var body = '';
-            res.on('data', function(chunk) { body += chunk; });
-            res.on('end', function() {
-                if (res.statusCode === 200 && body.indexOf('success') !== -1) {
-                    console.log('[vKomari] ✓ Basic info uploaded: ' + self.config.name);
-                } else {
-                    console.log('[vKomari] ! Basic info (' + res.statusCode + '): ' + self.config.name + ' - ' + body.substring(0, 100));
-                }
+        var paths = ['/api/v1/client/upload-basic-info', '/api/clients/uploadBasicInfo'];
+        paths.forEach(function (path) {
+            var url = new URL(conn.baseUrl + path + '?token=' + encodeURIComponent(c.client_secret));
+            var postData = JSON.stringify(info);
+            var req = (url.protocol === 'https:' ? https : http).request({
+                hostname: url.hostname, port: url.port || (url.protocol === 'https:' ? 443 : 80),
+                path: url.pathname + url.search,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Content-Length': Buffer.byteLength(postData),
+                    'User-Agent': 'komari-agent/1.2.0'
+                },
+                rejectUnauthorized: false
+            }, function (res) {
+                var body = '';
+                res.on('data', function (chunk) { body += chunk; });
+                res.on('end', function () {
+                    // Silently fail if one path doesn't work, as we support two versions
+                });
             });
+            req.on('error', function (err) { });
+            req.write(postData);
+            req.end();
         });
-        req.on('error', function (err) {
-            console.log('[vKomari] ! Basic info error: ' + self.config.name + ' - ' + err.message);
-        });
-        req.write(postData);
-        req.end();
-    } catch (e) {
-        console.log('[vKomari] ! Basic info exception: ' + e.message);
-    }
+    } catch (e) { }
 };
 
-Agent.prototype.startLoops = function (httpUrl) {
+Agent.prototype.startLoops = function (conn) {
     var self = this;
-    clearInterval(this.timers.heartbeat); clearInterval(this.timers.info);
+    if (conn.timers.heartbeat) clearInterval(conn.timers.heartbeat);
+    if (conn.timers.info) clearInterval(conn.timers.info);
+
     var iv = Math.max(1000, Math.min(10000, (this.config.report_interval || 1) * 1000));
-    this.sendData();
-    this.timers.heartbeat = setInterval(function () { if (self.ws && self.ws.readyState === WebSocket.OPEN) self.sendData(); }, iv);
-    this.timers.info = setInterval(function () { if (self.state.connected) self.uploadInfo(httpUrl); }, 300000);
+    this.sendToConn(conn);
+    conn.timers.heartbeat = setInterval(function () {
+        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) self.sendToConn(conn);
+    }, iv);
+    conn.timers.info = setInterval(function () {
+        if (conn.online) self.uploadInfo(conn);
+    }, 300000);
+};
+
+Agent.prototype.startSim = function () {
+    var self = this;
+    if (this.simTimer) clearInterval(this.simTimer);
+    var iv = Math.max(1000, Math.min(10000, (this.config.report_interval || 1) * 1000));
+    this.simTimer = setInterval(function () { self.updateLiveStats(); }, iv);
 };
 
 Agent.prototype.sendData = function () {
+    // Legacy support or internal calls
+    this.updateLiveStats();
+};
+
+Agent.prototype.updateLiveStats = function () {
     var c = this.config;
+    var now = new Date();
+    var hour = now.getHours();
+    var minute = now.getMinutes();
+    var interval = c.report_interval || 3;
+    this.sim.tickCount++;
 
-    // 确定当前资源使用百分比
-    this.sim.cpu = this.fluctuate(this.sim.cpu, Number(c.cpu_min) || 0, Number(c.cpu_max) || 100, 0.5);
-    this.sim.mem = this.fluctuate(this.sim.mem, Number(c.mem_min) || 0, Number(c.mem_max) || 100, 0.2);
-    this.sim.swap = this.fluctuate(this.sim.swap, Number(c.swap_min) || 0, Number(c.swap_max) || 100, 0.1);
-    this.sim.disk = this.fluctuate(this.sim.disk, Number(c.disk_min) || 0, Number(c.disk_max) || 100, 0.01);
+    // 1. 负载特征（基于 profile）
+    var profile = (c.load_profile || 'low').toLowerCase();
+    var profileMap = {
+        'low': { jitter: 0.8, spikeChance: 0.01, burstScale: 0.3, inertia: 0.85 },
+        'mid': { jitter: 2.5, spikeChance: 0.05, burstScale: 0.7, inertia: 0.70 },
+        'high': { jitter: 5.0, spikeChance: 0.15, burstScale: 1.2, inertia: 0.50 }
+    };
+    var p = profileMap[profile] || profileMap['low'];
 
-    var netUp = this.rand(c.net_min || 100, c.net_max || 5000);
-    var netDown = this.rand(c.net_min || 100, c.net_max || 5000);
-    var interval = c.report_interval || 1;
-    this.state.totalUp += netUp * interval;
-    this.state.totalDown += netDown * interval;
+    // 2. CPU 核心算法 (日夜周期 + 随机游走 + 突变)
+    // 增加正弦波模拟业务周期性波动
+    var timeFactor = (Math.sin(((hour - 9) / 24) * 2 * Math.PI) + 1) / 2; // 0-1
+    var waveFactor = Math.sin(this.sim.tickCount / 20) * 0.05; // 周期性微弱波动
 
-    var baseLoad = (this.sim.cpu / 100) * (c.cpu_cores || 1);
-    var load1 = parseFloat((baseLoad * this.randFloat(0.8, 1.2)).toFixed(2));
+    var cpuMin = Number(c.cpu_min) || 0.5;
+    var cpuMax = Number(c.cpu_max) || 100;
+    var range = cpuMax - cpuMin;
 
-    this.sim.conn = Math.round(this.fluctuate(this.sim.conn, c.conn_min || 2, c.conn_max || 10, 0.5));
-    if (this.sim.conn < (c.conn_min || 2)) this.sim.conn = c.conn_min || 2;
-    this.sim.proc = Math.round(this.fluctuate(this.sim.proc, c.proc_min || 40, c.proc_max || 60, 0.5));
-    if (this.sim.proc < (c.proc_min || 40)) this.sim.proc = c.proc_min || 40;
+    // 基础波动目标值
+    var target = cpuMin + (range * (0.1 + waveFactor) * timeFactor);
 
+    // 定时任务 (Cron) 模拟: 每 30 分钟一个小高峰
+    if (minute % 30 === 0 && now.getSeconds() < 15) target += range * 0.15;
+
+    // 随机突发处理
+    if (this.sim.cpuBurstDecay <= 0 && Math.random() < p.spikeChance) {
+        this.sim.cpuBurstLevel = this.randFloat(range * 0.2, range * 0.6) * p.burstScale;
+        this.sim.cpuBurstDecay = this.rand(4, 12);
+    }
+
+    target += this.sim.cpuBurstLevel;
+
+    // 指数平滑算法 (惯性过渡) - 降低 inertia 使其不那么平滑
+    this.sim.cpu = this.sim.cpu * p.inertia + target * (1 - p.inertia);
+    this.sim.cpu += (Math.random() * 2 - 1) * p.jitter; // 增加高频抖动
+
+    // 突发衰减
+    if (this.sim.cpuBurstDecay > 0) {
+        this.sim.cpuBurstDecay--;
+    } else {
+        this.sim.cpuBurstLevel *= 0.8;
+    }
+    this.sim.cpu = parseFloat(Math.max(cpuMin, Math.min(cpuMax, this.sim.cpu)).toFixed(1));
+
+    // 3. 内存模拟 (重点：增加真实的基础开销)
+    var ramTotalMB = Number(c.ram_total) || 1024;
+    // 模拟 Linux 系统基础开销 (OS + 基础服务)
+    var systemBaseMB = ramTotalMB <= 512 ? (ramTotalMB * 0.4) : (150 + ramTotalMB * 0.1);
+    var systemBasePct = (systemBaseMB / ramTotalMB) * 100;
+
+    var memMin = Math.max(Number(c.mem_min) || 0, systemBasePct);
+    var memMax = Math.max(Number(c.mem_max) || 0, memMin + 2);
+
+    // 内存跟随 CPU 负载有一定正相关，但有较大延迟
+    var memTarget = memMin + (this.sim.cpu / 100) * (memMax - memMin) * 0.3;
+
+    // 内存泄漏/缓存累积模拟
+    if (this.sim.tickCount % 60 === 0) {
+        this.sim.memLeakAccum += 0.02 * (profile === 'high' ? 2 : 1);
+        if (Math.random() < 0.005) this.sim.memLeakAccum *= 0.5; // GC
+    }
+
+    this.sim.mem = this.sim.mem * 0.98 + (memTarget + this.sim.memLeakAccum) * 0.02 + (Math.random() * 0.1 - 0.05);
+    this.sim.mem = parseFloat(Math.max(memMin, Math.min(memMax, this.sim.mem)).toFixed(1));
+
+    // 4. 网络模拟 (流量跟随 CPU 负载 + 随机流量爆发)
+    var netMin = Number(c.net_min) || 0;
+    var netMax = Number(c.net_max) || 1048576;
+    var netRange = netMax - netMin;
+
+    var netLoadRatio = (this.sim.cpu - cpuMin) / (range || 1);
+    var currentNet = netMin + (netRange * 0.1 * timeFactor) + (netRange * 0.6 * netLoadRatio);
+
+    if (Math.random() < 0.03 * p.burstScale) currentNet += netRange * this.randFloat(0.3, 0.7);
+
+    this.state.currentUp = currentNet * 0.4 + (Math.random() * (netMin + 100) * 0.2);
+    this.state.currentDown = currentNet * 0.6 + (Math.random() * (netMin + 100) * 0.2);
+    this.state.totalUp += this.state.currentUp * interval;
+    this.state.totalDown += this.state.currentDown * interval;
+
+    // 流量月度重置
+    var resetDay = Number(c.traffic_reset_day) || 1;
+    if (now.getDate() === resetDay && hour === 0 && minute === 0 && now.getSeconds() < interval) {
+        this.state.totalUp = 0;
+        this.state.totalDown = 0;
+    }
+
+    // 5. 联动数据 (连接数/进程数/Swap/Disk)
+    this.sim.conn = Math.round((Number(c.conn_min) || 10) + (this.sim.cpu * 2.5 * p.burstScale) + (Math.random() * 5));
+    this.sim.proc = Math.round((Number(c.proc_min) || 50) + (this.sim.cpu * 0.3) + (Math.random() * 3));
+    var swapVal = (this.sim.mem > 80) ? (this.sim.mem - 80) * 1.2 : (Number(c.swap_min) || 0);
+    this.sim.swap = parseFloat(swapVal.toFixed(1));
+
+    // 磁盘：模拟操作系统占用 + 用户设置的最小占用
+    var diskTotalMB = Number(c.disk_total) || 10240;
+    var osUsageMB = diskTotalMB <= 2048 ? (diskTotalMB * 0.65) : (800 + diskTotalMB * 0.03);
+    var osUsagePct = (osUsageMB / diskTotalMB) * 100;
+    var dMin = Math.max(Number(c.disk_min) || 0, osUsagePct);
+
+    // 模拟磁盘随时间缓慢增长
+    if (this.sim.tickCount % 60 === 0) this.sim.disk += 0.001;
+    var diskWave = Math.sin(this.sim.tickCount / 100) * 0.02;
+    this.sim.disk = parseFloat(Math.max(dMin, Math.min(99.8, this.sim.disk + diskWave)).toFixed(1));
+
+    // 6. GPU 模拟
+    if (c.gpu_name) {
+        var gpuVal = this.sim.gpu * 0.9 + (this.sim.cpu * 0.8) * 0.1 + (Math.random() * 0.5);
+        this.sim.gpu = parseFloat(gpuVal.toFixed(1));
+    }
+};
+
+Agent.prototype.sendToConn = function (conn) {
+    var c = this.config;
     var ramTotal = Math.floor((Number(c.ram_total) || 1024) * 1048576);
     var swapTotal = Math.floor((Number(c.swap_total) || 0) * 1048576);
     var diskTotal = Math.floor((Number(c.disk_total) || 10240) * 1048576);
 
-    var memUsed = Math.floor(ramTotal * this.sim.mem / 100);
-    var swapUsed = Math.floor(swapTotal * this.sim.swap / 100);
-    var diskUsed = Math.floor(diskTotal * this.sim.disk / 100);
-
     var data = {
         type: 'report',
-        cpu: { usage: parseFloat(this.sim.cpu.toFixed(1)) },
-        ram: { total: ramTotal, used: memUsed },
-        swap: { total: swapTotal, used: swapUsed },
-        disk: { total: diskTotal, used: diskUsed },
-        load: { load1: load1, load5: parseFloat((load1 * 0.92).toFixed(2)), load15: parseFloat((load1 * 0.85).toFixed(2)) },
-        network: { up: netUp, down: netDown, totalUp: this.state.totalUp, totalDown: this.state.totalDown },
-        connections: { tcp: this.sim.conn, udp: this.rand(0, 5) },
+        cpu: {
+            name: c.cpu_model || 'Intel Xeon',
+            cores: parseInt(c.cpu_cores) || 2,
+            arch: c.arch || 'amd64',
+            usage: parseFloat(this.sim.cpu.toFixed(1))
+        },
+        ram: {
+            total: this.usable.ram,
+            used: Math.round(this.usable.ram * this.sim.mem / 100)
+        },
+        swap: {
+            total: this.usable.swap,
+            used: Math.round(this.usable.swap * this.sim.swap / 100)
+        },
+        load: {
+            load1: parseFloat(((this.sim.cpu / 100) * (c.cpu_cores || 1) * 1.05).toFixed(1)),
+            load5: parseFloat(((this.sim.cpu / 100) * (c.cpu_cores || 1) * 0.95).toFixed(1)),
+            load15: parseFloat(((this.sim.cpu / 100) * (c.cpu_cores || 1) * 0.9).toFixed(1))
+        },
+        disk: {
+            total: this.usable.disk,
+            used: Math.round(this.usable.disk * this.sim.disk / 100)
+        },
+        network: {
+            up: Math.floor(this.state.currentUp || 0),
+            down: Math.floor(this.state.currentDown || 0),
+            totalUp: Math.floor(this.state.totalUp),
+            totalDown: Math.floor(this.state.totalDown)
+        },
+        connections: {
+            tcp: this.sim.conn,
+            udp: this.rand(0, 5)
+        },
+        gpu: {
+            count: c.gpu_name ? 1 : 0,
+            average_usage: c.gpu_name ? parseFloat(this.sim.gpu.toFixed(1)) : 0,
+            detailed_info: c.gpu_name ? [{
+                name: c.gpu_name,
+                memory_total: 8589934592,
+                memory_used: Math.floor(8589934592 * (this.sim.gpu / 100)),
+                utilization: parseFloat(this.sim.gpu.toFixed(1)),
+                temperature: 40 + Math.floor(this.sim.gpu / 2)
+            }] : []
+        },
+        uptime: this.uptimeBase + Math.floor((Date.now() - this.startTime) / 1000),
         process: this.sim.proc,
-        uptime: Math.floor(Date.now() / 1000) - this.bootTime,
         message: ''
     };
-
-    try {
-        this.ws.send(JSON.stringify(data));
-        this.state.sendCount++;
-    } catch (e) {
-        console.log('[vKomari] Send error:', e.message);
-    }
+    try { conn.ws.send(JSON.stringify(data)); this.state.sendCount++; } catch (e) { }
 };
 
 Agent.prototype.status = function () {
-    return { online: this.state.connected, sendCount: this.state.sendCount, uptime: Math.floor(Date.now() / 1000) - this.bootTime, lastError: this.state.lastError };
+    var online = this.connections.some(c => c.online);
+    var errors = this.connections.map(c => c.lastError).filter(Boolean).join('; ');
+    return { online: online, sendCount: this.state.sendCount, uptime: Math.floor(Date.now() / 1000) - this.bootTime, lastError: errors };
 };
 
 function loadNodes() {
@@ -439,9 +754,14 @@ app.post('/api/toggle', auth, function (req, res) {
 app.post('/api/nodes', auth, function (req, res) {
     var d = req.body;
     if (!d.client_uuid) d.client_uuid = crypto.randomUUID();
-    if (!d.id && !d.fake_ip) d.fake_ip = generateFakeIP(d.region || 'US');
+    if (!d.id && !d.fake_ip) d.fake_ip = '';
 
-    var fields = 'name,server_address,client_secret,client_uuid,cpu_model,cpu_cores,ram_total,swap_total,disk_total,os,arch,virtualization,region,kernel_version,load_profile,cpu_min,cpu_max,mem_min,mem_max,swap_min,swap_max,disk_min,disk_max,net_min,net_max,conn_min,conn_max,proc_min,proc_max,report_interval,enabled,boot_time,fake_ip';
+    // 如果没有填开机日期（uptime_base 为 0），则随机生成一个 20-60 天的时间
+    if (!d.uptime_base || d.uptime_base == 0) {
+        d.uptime_base = Math.floor(Math.random() * (60 - 20) + 20) * 86400;
+    }
+
+    var fields = 'name,server_address,client_secret,client_uuid,cpu_model,cpu_cores,ram_total,swap_total,disk_total,os,arch,virtualization,region,kernel_version,load_profile,cpu_min,cpu_max,mem_min,mem_max,swap_min,swap_max,disk_min,disk_max,net_min,net_max,conn_min,conn_max,proc_min,proc_max,report_interval,enabled,boot_time,fake_ip,group_name,gpu_name,ipv6,traffic_reset_day,uptime_base';
     var keys = fields.split(',');
     var values = keys.map(function (k) { return d[k] === undefined ? null : d[k]; });
 
@@ -478,21 +798,61 @@ app.post('/api/batch', auth, function (req, res) {
     });
 });
 
+app.get('/api/templates', auth, function (req, res) {
+    db.all('SELECT * FROM templates ORDER BY id DESC', [], function (e, rows) {
+        if (e) return res.status(500).json({ error: e.message });
+        res.json(rows.map(r => ({ id: r.id, name: r.name, config: JSON.parse(r.config) })));
+    });
+});
+
+app.post('/api/templates', auth, function (req, res) {
+    var name = req.body.name, config = JSON.stringify(req.body.config);
+    db.run('INSERT INTO templates (name, config) VALUES (?, ?)', [name, config], function (e) {
+        if (e) return res.status(500).json({ error: e.message });
+        res.json({ status: 'ok', id: this.lastID });
+    });
+});
+
+app.post('/api/templates/delete', auth, function (req, res) {
+    var id = req.body.id;
+    db.run('DELETE FROM templates WHERE id=?', [id], function (e) {
+        res.json({ status: 'ok' });
+    });
+});
+
+app.post('/api/import', auth, function (req, res) {
+    var nodes = req.body.nodes;
+    if (!Array.isArray(nodes)) return res.status(400).json({ error: 'Invalid data' });
+
+    var fields = 'name,server_address,client_secret,client_uuid,cpu_model,cpu_cores,ram_total,swap_total,disk_total,os,arch,virtualization,region,kernel_version,load_profile,cpu_min,cpu_max,mem_min,mem_max,swap_min,swap_max,disk_min,disk_max,net_min,net_max,conn_min,conn_max,proc_min,proc_max,report_interval,enabled,boot_time,fake_ip,group_name,traffic_reset_day';
+    var keys = fields.split(',');
+
+    nodes.forEach(function (n) {
+        if (!n.client_uuid) n.client_uuid = crypto.randomUUID();
+        if (!n.fake_ip) n.fake_ip = '';
+        var values = keys.map(function (k) { return n[k] === undefined ? null : n[k]; });
+        var placeholders = keys.map(function () { return '?'; }).join(',');
+        var sql = 'INSERT INTO nodes (' + keys.join(',') + ') VALUES (' + placeholders + ')';
+        db.run(sql, values, function (e) {
+            if (!e) {
+                var id = this.lastID;
+                var a = new Agent(Object.assign({}, n, { id: id }));
+                activeAgents.set(id, a); a.start();
+            }
+        });
+    });
+    res.json({ status: 'imported' });
+});
+
 app.post('/api/delete', auth, function (req, res) {
     var id = req.body.id;
     db.run('DELETE FROM nodes WHERE id=?', [id], function (e) {
         if (e) return res.status(500).json({ error: e.message });
         if (activeAgents.has(id)) { activeAgents.get(id).stop(); activeAgents.delete(id); }
-        res.json({ status: 'ok' });
+        res.json({ status: 'deleted' });
     });
 });
 
-app.get('/api/presets', function (req, res) {
-    res.json({
-        low: { cpu_min: 1, cpu_max: 30, mem_min: 8, mem_max: 12, swap_min: 0, swap_max: 0, disk_min: 8, disk_max: 8.1, net_min: 100, net_max: 2000, conn_min: 2, conn_max: 5, proc_min: 35, proc_max: 45 },
-        mid: { cpu_min: 1, cpu_max: 60, mem_min: 35, mem_max: 45, swap_min: 1, swap_max: 5, disk_min: 35, disk_max: 35.5, net_min: 10240, net_max: 102400, conn_min: 30, conn_max: 80, proc_min: 70, proc_max: 90 },
-        high: { cpu_min: 1, cpu_max: 90, mem_min: 80, mem_max: 90, swap_min: 20, swap_max: 40, disk_min: 75, disk_max: 80, net_min: 1048576, net_max: 5242880, conn_min: 300, conn_max: 800, proc_min: 120, proc_max: 200 }
-    });
-});
+// /api/presets 已迁移至前端 dropdown_data.js
 
 app.listen(PORT, function () { console.log('[vKomari] v0.1.0 running on port ' + PORT); loadNodes(); });
