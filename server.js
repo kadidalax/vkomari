@@ -727,6 +727,25 @@ app.post('/api/batch', auth, function (req, res) {
     });
 });
 
+app.post('/api/groups/rename', auth, function (req, res) {
+    var oldName = req.body.oldName || '';
+    var newName = req.body.newName || '';
+    if (oldName === newName) return res.json({ status: 'no_change' });
+
+    db.run('UPDATE nodes SET group_name=? WHERE group_name=?', [newName, oldName], function (e) {
+        if (e) return res.status(500).json({ error: e.message });
+        
+        // Update local agents' config
+        activeAgents.forEach(function (a) {
+            if (a.config.group_name === oldName) {
+                a.config.group_name = newName;
+            }
+        });
+        
+        res.json({ status: 'ok', updated: this.changes });
+    });
+});
+
 app.get('/api/templates', auth, function (req, res) {
     db.all('SELECT * FROM templates ORDER BY id DESC', [], function (e, rows) {
         if (e) return res.status(500).json({ error: e.message });
