@@ -1,0 +1,18 @@
+services:
+  vkomari:
+    image: ghcr.io/kadidalax/vkomari:latest
+    container_name: vkomari
+    restart: unless-stopped
+    ports:
+      - "25770:25770"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DB_PATH=/app/data/vkomari.db
+      - JWT_SECRET=change-me-to-something-very-random
+    # 如果是小内存 VPS，可以保留这些限制
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
