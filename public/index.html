@@ -320,6 +320,15 @@
                             <span
                                 class="text-xs font-mono text-zinc-500 bg-zinc-800/50 px-2 py-0.5 rounded-full border border-zinc-700/30"
                                 x-text="nodesInGroup(group).length"></span>
+                            <button @click="renameGroup(group)" x-show="group"
+                                class="p-1 text-zinc-500 hover:text-emerald-400 transition-colors rounded hover:bg-zinc-800/50"
+                                title="编辑分组名称">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                                    </path>
+                                </svg>
+                            </button>
                         </h2>
                         <div class="flex-1 h-px bg-gradient-to-r from-zinc-700/50 to-transparent ml-2"></div>
                     </div>
@@ -520,10 +529,23 @@
                             <input type="text" x-model="form.name"
                                 class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
                         </div>
-                        <div>
+                        <div class="relative">
                             <label class="block text-xs text-zinc-400 mb-1.5">分组名称 (可选)</label>
                             <input type="text" x-model="form.group_name" placeholder="例如: 香港集群"
+                                @focus="showGroupList=true" @input="showGroupList=true"
+                                @blur="setTimeout(()=>showGroupList=false,200)"
                                 class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none transition">
+                            <div x-show="showGroupList && groups.length > 0"
+                                class="absolute z-30 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg max-h-40 overflow-y-auto shadow-2xl custom-scrollbar"
+                                x-transition>
+                                <template x-for="g in groups" :key="g">
+                                    <div @mousedown.prevent="form.group_name=g;showGroupList=false"
+                                        class="px-3 py-2 hover:bg-zinc-700 cursor-pointer text-sm text-zinc-300 transition"
+                                        x-show="g && (form.group_name === '' || g.toLowerCase().includes(form.group_name.toLowerCase()))">
+                                        <span x-text="g"></span>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                         <div class="relative">
                             <label class="block text-xs text-zinc-400 mb-1.5">地区 (搜索)</label>
@@ -860,6 +882,40 @@
         </div>
     </div>
 
+    <!-- 重命名分组弹窗 -->
+    <div x-show="showRenameModal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50"
+        style="display:none" x-transition.opacity>
+        <div
+            class="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl modal-enter">
+            <div class="bg-gradient-to-br from-emerald-500/20 to-transparent p-6 pb-4">
+                <div
+                    class="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-500 mb-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                        </path>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-white">重命名分组</h2>
+                <p class="text-zinc-400 text-sm mt-1">修改 "<span class="text-emerald-400"
+                        x-text="renameForm.oldName"></span>" 分组名称</p>
+            </div>
+            <div class="p-6 pt-2 space-y-4">
+                <div class="relative">
+                    <input type="text" x-model="renameForm.newName" @keyup.enter="confirmRename" placeholder="输入新的分组名称"
+                        class="w-full bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3.5 focus:border-emerald-500 focus:outline-none transition text-white placeholder-zinc-500">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button @click="showRenameModal=false"
+                        class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition">取消</button>
+                    <button @click="confirmRename"
+                        class="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white py-3 rounded-xl font-bold transition shadow-lg shadow-emerald-900/30">确认修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 通用对话框 (Alert/Confirm) -->
     <div x-show="confirmDialog.show"
         class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
@@ -948,6 +1004,9 @@
                 // Toasts & Dialogs
                 toasts: [],
                 confirmDialog: { show: false, title: '', message: '', type: 'info', isConfirm: false, confirmText: '确定', onConfirm: () => { }, onCancel: () => { } },
+                showRenameModal: false,
+                renameForm: { oldName: '', newName: '' },
+                showGroupList: false,
 
                 notify(message, type = 'info') {
                     const id = Date.now();
@@ -1101,6 +1160,31 @@
                 start() { this.loadNodes(); setInterval(() => this.loadNodes(), 3000); },
 
                 async loadNodes() { if (this.token) { const d = await this.api('/api/nodes'); if (d) this.nodes = d; } },
+
+                async renameGroup(oldName) {
+                    this.renameForm = { oldName, newName: oldName };
+                    this.showRenameModal = true;
+                },
+
+                async confirmRename() {
+                    const { oldName, newName } = this.renameForm;
+                    if (!newName || newName === oldName) {
+                        this.showRenameModal = false;
+                        return;
+                    }
+
+                    const r = await this.api('/api/groups/rename', 'POST', { oldName, newName });
+                    if (r && r.status === 'ok') {
+                        this.notify(`已重命名分组 ${oldName} 为 ${newName}`, 'success');
+                        this.showRenameModal = false;
+                        this.loadNodes();
+                        if (this.activeGroup === oldName) this.activeGroup = newName;
+                    } else if (r && r.status === 'no_change') {
+                        this.showRenameModal = false;
+                    } else {
+                        this.notify('重命名失败', 'error');
+                    }
+                },
 
                 openModal() {
                     const p = this.dd.loadPresets.low || {};
