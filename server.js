@@ -174,11 +174,15 @@ function Agent(config) {
         tickCount: Math.floor(Math.random() * 1000) // 随机初始 tick，使不同节点的正弦波周期错开
     };
 
+    this.startTime = Date.now();
+    this.uptimeBase = Number(config.uptime_base) || 0;
+    this.uuid = config.client_uuid || crypto.randomUUID();
+
     // 流量模拟逻辑：总流量与开机时间相关联
     // 获取当月已运行天数（模拟月度流量）
     var dayOfMonth = (new Date()).getDate();
-    // 假设平均每天产生的流量 (根据配置的范围取均值)
-    var avgNetDaily = ((Number(config.net_min) || 1024) + (Number(config.net_max) || 102400)) / 2;
+    // 假设平均每天产生的流量 (根据配置的范围取均值，并乘以 86400 转换为日总量)
+    var avgNetDaily = ((Number(config.net_min) || 1024) + (Number(config.net_max) || 102400)) / 2 * 86400;
     // 实际模拟运行天数（不超过当月天数）
     var simDays = Math.min(dayOfMonth, (this.uptimeBase / 86400));
 
@@ -187,10 +191,6 @@ function Agent(config) {
         totalUp: Math.floor(simDays * avgNetDaily * 0.4 * (Math.random() * 0.5 + 0.75)),
         totalDown: Math.floor(simDays * avgNetDaily * 0.6 * (Math.random() * 0.5 + 0.75))
     };
-
-    this.startTime = Date.now();
-    this.uptimeBase = Number(config.uptime_base) || 0;
-    this.uuid = config.client_uuid || crypto.randomUUID();
 
     // 硬件指纹：计算真实的可用值（非整数，模拟系统预留和文件系统开销）
     this.calculateUsableHardware();
@@ -284,8 +284,18 @@ Agent.prototype.update = function (newConfig) {
     this.sim.conn = Math.round((Number(newConfig.conn_min) || 50) + (Math.random() * 5));
     this.sim.proc = Math.round((Number(newConfig.proc_min) || 100) + (Math.random() * 3));
     this.sim.tickCount = Math.floor(Math.random() * 1000); // 重置时也随机化 tick，错开周期
+    var oldUptimeBase = this.uptimeBase;
     this.uptimeBase = Number(newConfig.uptime_base) || 0;
     this.startTime = Date.now();
+
+    // 如果当前流量为 0 或 NaN，或者 uptime_base 发生了显著变化，重新初始化流量
+    if (!this.state.totalUp || isNaN(this.state.totalUp) || Math.abs(this.uptimeBase - oldUptimeBase) > 3600) {
+        var dayOfMonth = (new Date()).getDate();
+        var avgNetDaily = ((Number(newConfig.net_min) || 1024) + (Number(newConfig.net_max) || 102400)) / 2 * 86400;
+        var simDays = Math.min(dayOfMonth, (this.uptimeBase / 86400));
+        this.state.totalUp = Math.floor(simDays * avgNetDaily * 0.4 * (Math.random() * 0.5 + 0.75));
+        this.state.totalDown = Math.floor(simDays * avgNetDaily * 0.6 * (Math.random() * 0.5 + 0.75));
+    }
 
     // 重新计算硬件指纹（如果规格变了）
     this.calculateUsableHardware();
@@ -687,7 +697,7 @@ app.post('/api/nodes', auth, function (req, res) {
 
     // 如果没有填开机日期（uptime_base 为 0），则随机生成一个 20-60 天的时间
     if (!d.uptime_base || d.uptime_base == 0) {
-        d.uptime_base = Math.floor(Math.random() * (60 - 20) + 20) * 86400;
+        d.uptime_base = Math.floor(Math.random() * 7 + 1) * 86400;
     }
 
     var fields = 'name,server_address,client_secret,client_uuid,cpu_model,cpu_cores,ram_total,swap_total,disk_total,os,arch,virtualization,region,kernel_version,load_profile,cpu_min,cpu_max,mem_min,mem_max,swap_min,swap_max,disk_min,disk_max,net_min,net_max,conn_min,conn_max,proc_min,proc_max,report_interval,enabled,boot_time,fake_ip,group_name,gpu_name,ipv6,traffic_reset_day,uptime_base';
@@ -734,14 +744,14 @@ app.post('/api/groups/rename', auth, function (req, res) {
 
     db.run('UPDATE nodes SET group_name=? WHERE group_name=?', [newName, oldName], function (e) {
         if (e) return res.status(500).json({ error: e.message });
-        
+
         // Update local agents' config
         activeAgents.forEach(function (a) {
             if (a.config.group_name === oldName) {
                 a.config.group_name = newName;
             }
         });
-        
+
         res.json({ status: 'ok', updated: this.changes });
     });
 });
@@ -772,12 +782,15 @@ app.post('/api/import', auth, function (req, res) {
     var nodes = req.body.nodes;
     if (!Array.isArray(nodes)) return res.status(400).json({ error: 'Invalid data' });
 
-    var fields = 'name,server_address,client_secret,client_uuid,cpu_model,cpu_cores,ram_total,swap_total,disk_total,os,arch,virtualization,region,kernel_version,load_profile,cpu_min,cpu_max,mem_min,mem_max,swap_min,swap_max,disk_min,disk_max,net_min,net_max,conn_min,conn_max,proc_min,proc_max,report_interval,enabled,boot_time,fake_ip,group_name,traffic_reset_day';
+    var fields = 'name,server_address,client_secret,client_uuid,cpu_model,cpu_cores,ram_total,swap_total,disk_total,os,arch,virtualization,region,kernel_version,load_profile,cpu_min,cpu_max,mem_min,mem_max,swap_min,swap_max,disk_min,disk_max,net_min,net_max,conn_min,conn_max,proc_min,proc_max,report_interval,enabled,boot_time,fake_ip,group_name,gpu_name,ipv6,traffic_reset_day,uptime_base';
     var keys = fields.split(',');
 
     nodes.forEach(function (n) {
         if (!n.client_uuid) n.client_uuid = crypto.randomUUID();
         if (!n.fake_ip) n.fake_ip = '';
+        if (!n.uptime_base || n.uptime_base == 0) {
+            n.uptime_base = Math.floor(Math.random() * 7 + 1) * 86400;
+        }
         var values = keys.map(function (k) { return n[k] === undefined ? null : n[k]; });
         var placeholders = keys.map(function () { return '?'; }).join(',');
         var sql = 'INSERT INTO nodes (' + keys.join(',') + ') VALUES (' + placeholders + ')';
