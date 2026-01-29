@@ -1017,6 +1017,7 @@
                 countrySearch: '',
                 showCountryList: false,
                 installScript: '',
+                isDragging: false,
 
                 // Toasts & Dialogs
                 toasts: [],
@@ -1130,26 +1131,24 @@
                         animation: 150,
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
+                        onStart: () => {
+                            // 拖拽开始时禁止自动刷新，防止数据覆盖
+                            this.isDragging = true;
+                        },
                         onEnd: async (evt) => {
+                            this.isDragging = false;
                             if (evt.oldIndex === evt.newIndex) return;
 
-                            // Get all nodes in this group
-                            const groupNodes = this.nodesInGroup(groupName);
-                            // Reorder them
+                            // 重要：直接从当前显示的原始节点数据中获取该分组的节点
+                            // 必须按当前的 nodes 顺序筛选，以保证 oldIndex 对应正确
+                            const groupNodes = this.nodes.filter(n => (n.group_name || '') === groupName);
+
+                            // 模拟移动后的数组项
                             const movedItem = groupNodes.splice(evt.oldIndex, 1)[0];
                             groupNodes.splice(evt.newIndex, 0, movedItem);
 
-                            // Update the nodes array while maintaining other groups
-                            const otherNodes = this.nodes.filter(n => (n.group_name || '') !== groupName);
-
-                            // Recalculate sort_order for all nodes
-                            // Here we use a global strategy: all nodes will have a sort_order
-                            // Nodes in other groups retain their relative order but might have adjusted indices
-                            const updatedNodes = [...otherNodes, ...groupNodes];
-
-                            // Sort primarily by group if you want to keep groups together in the DB,
-                            // or just assign new orders based on current visual order.
-                            // We'll update the sort_order of the MOVED items in this group.
+                            // 构建所有需要更新的 ID 和排序值
+                            // 排序值从 0 开始递增
                             const orders = groupNodes.map((n, index) => ({
                                 id: n.id,
                                 sort_order: index
@@ -1158,13 +1157,16 @@
                             try {
                                 const response = await this.api('/api/nodes/reorder', 'POST', { orders });
                                 if (response && response.status === 'ok') {
-                                    this.notify('排序已更新', 'success');
-                                    this.loadNodes(); // Refresh to ensure sync
+                                    this.notify('排序已保存', 'success');
+                                    // 更新本地数据并强制重新排序，避免等待轮询
+                                    await this.loadNodes();
                                 } else {
                                     this.notify('排序保存失败', 'error');
+                                    this.loadNodes(); // 恢复原始顺序
                                 }
                             } catch (e) {
                                 this.notify('网络错误', 'error');
+                                this.loadNodes();
                             }
                         }
                     });
@@ -1224,7 +1226,12 @@
 
                 start() { this.loadNodes(); setInterval(() => this.loadNodes(), 3000); },
 
-                async loadNodes() { if (this.token) { const d = await this.api('/api/nodes'); if (d) this.nodes = d; } },
+                async loadNodes() {
+                    if (this.token && !this.isDragging) {
+                        const d = await this.api('/api/nodes');
+                        if (d) this.nodes = d;
+                    }
+                },
 
                 async renameGroup(oldName) {
                     this.renameForm = { oldName, newName: oldName };
