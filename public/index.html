@@ -1064,8 +1064,12 @@
                     return Array.from(g).sort();
                 },
 
+                get sortedNodes() {
+                    return [...this.nodes].sort((a, b) => (a.sort_order - b.sort_order) || (b.id - a.id));
+                },
+
                 get filteredNodes() {
-                    let filtered = this.nodes;
+                    let filtered = this.sortedNodes;
                     if (this.activeGroup !== '') {
                         filtered = filtered.filter(n => (n.group_name || '') === this.activeGroup);
                     }
@@ -1155,13 +1159,15 @@
                                 const response = await this.api('/api/nodes/reorder', 'POST', { orders });
                                 if (response && response.status === 'ok') {
                                     this.notify('排序已保存', 'success');
-                                    // 同步本地 nodes 数组中的 sort_order
-                                    orders.forEach(o => {
-                                        const node = this.nodes.find(nx => nx.id === o.id);
-                                        if (node) node.sort_order = o.sort_order;
+                                    // 同步本地 nodes 数组中的 sort_order，并强制触发 Alpine.js 响应式更新
+                                    const updatedNodes = this.nodes.map(node => {
+                                        const orderInfo = orders.find(o => o.id === node.id);
+                                        if (orderInfo) {
+                                            return { ...node, sort_order: orderInfo.sort_order };
+                                        }
+                                        return node;
                                     });
-                                    // 全局排序逻辑：sort_order 升序，id 降序
-                                    this.nodes = [...this.nodes].sort((a, b) => (a.sort_order - b.sort_order) || (b.id - a.id));
+                                    this.nodes = updatedNodes;
                                 } else {
                                     this.notify('排序保存失败', 'error');
                                     await this.loadNodes();
