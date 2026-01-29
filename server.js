@@ -719,14 +719,29 @@ app.post('/api/nodes', auth, function (req, res) {
             res.json({ status: 'updated' });
         });
     } else {
-        var placeholders = keys.map(function () { return '?'; }).join(',');
-        var sql = 'INSERT INTO nodes (' + keys.join(',') + ') VALUES (' + placeholders + ')';
-        db.run(sql, values, function (e) {
-            if (e) { console.error(e); return res.status(500).json({ error: e.message }); }
-            var id = this.lastID;
-            var a = new Agent(Object.assign({}, d, { id: id }));
-            activeAgents.set(id, a); a.start();
-            res.json({ status: 'created', id: id });
+        // 获取当前最大 sort_order
+        db.get('SELECT MAX(sort_order) as max_sort FROM nodes', function (err, row) {
+            var next_sort = (row && row.max_sort !== null) ? row.max_sort + 1 : 0;
+            d.sort_order = next_sort;
+
+            var localKeys = keys.slice();
+            var localValues = values.slice();
+
+            // 确保 sort_order 被包含在插入中
+            if (!localKeys.includes('sort_order')) {
+                localKeys.push('sort_order');
+                localValues.push(next_sort);
+            }
+
+            var placeholders = localKeys.map(function () { return '?'; }).join(',');
+            var sql = 'INSERT INTO nodes (' + localKeys.join(',') + ') VALUES (' + placeholders + ')';
+            db.run(sql, localValues, function (e) {
+                if (e) { console.error(e); return res.status(500).json({ error: e.message }); }
+                var id = this.lastID;
+                var a = new Agent(Object.assign({}, d, { id: id }));
+                activeAgents.set(id, a); a.start();
+                res.json({ status: 'created', id: id });
+            });
         });
     }
 });
@@ -749,22 +764,27 @@ app.post('/api/nodes/reorder', auth, function (req, res) {
 
     if (orders.length === 0) return res.json({ status: 'ok' });
 
-    orders.forEach(function (item) {
+    function updateNext(index) {
+        if (index >= orders.length) {
+            // 所有更新完成，更新本地缓存
+            orders.forEach(function (o) {
+                if (activeAgents.has(o.id)) {
+                    activeAgents.get(o.id).config.sort_order = o.sort_order;
+                }
+            });
+            return res.json({ status: 'ok' });
+        }
+
+        var item = orders[index];
         db.run('UPDATE nodes SET sort_order=? WHERE id=?', [item.sort_order, item.id], function (e) {
-            if (e) errorOccurred = true;
-            completed++;
-            if (completed === orders.length) {
-                if (errorOccurred) return res.status(500).json({ status: 'error' });
-                // Also update local agents' config
-                orders.forEach(function (o) {
-                    if (activeAgents.has(o.id)) {
-                        activeAgents.get(o.id).config.sort_order = o.sort_order;
-                    }
-                });
-                res.json({ status: 'ok' });
+            if (e) {
+                console.error('Reorder update failed for id ' + item.id, e);
             }
+            updateNext(index + 1);
         });
-    });
+    }
+
+    updateNext(0);
 });
 
 app.post('/api/groups/rename', auth, function (req, res) {
