@@ -1132,24 +1132,21 @@
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
                         onStart: () => {
-                            // 拖拽开始时禁止自动刷新，防止数据覆盖
                             this.isDragging = true;
                         },
                         onEnd: async (evt) => {
                             this.isDragging = false;
-                            if (evt.oldIndex === evt.newIndex) return;
+                            const oldIndex = evt.oldIndex;
+                            const newIndex = evt.newIndex;
+                            if (oldIndex === newIndex) return;
 
-                            // 重要：直接从当前显示的原始节点数据中获取该分组的节点
-                            // 必须按当前的 nodes 顺序筛选，以保证 oldIndex 对应正确
-                            const groupNodes = this.nodes.filter(n => (n.group_name || '') === groupName);
 
-                            // 模拟移动后的数组项
-                            const movedItem = groupNodes.splice(evt.oldIndex, 1)[0];
-                            groupNodes.splice(evt.newIndex, 0, movedItem);
+                            const visibleNodes = [...this.nodesInGroup(groupName)];
+                            const [movedItem] = visibleNodes.splice(oldIndex, 1);
+                            visibleNodes.splice(newIndex, 0, movedItem);
 
-                            // 构建所有需要更新的 ID 和排序值
-                            // 排序值从 0 开始递增
-                            const orders = groupNodes.map((n, index) => ({
+
+                            const orders = visibleNodes.map((n, index) => ({
                                 id: n.id,
                                 sort_order: index
                             }));
@@ -1158,8 +1155,12 @@
                                 const response = await this.api('/api/nodes/reorder', 'POST', { orders });
                                 if (response && response.status === 'ok') {
                                     this.notify('排序已保存', 'success');
-                                    // 更新本地数据并强制重新排序，避免等待轮询
-                                    await this.loadNodes();
+                                    // 立即同步本地状态
+                                    orders.forEach(o => {
+                                        const node = this.nodes.find(nx => nx.id === o.id);
+                                        if (node) node.sort_order = o.sort_order;
+                                    });
+                                    this.nodes.sort((a, b) => (a.sort_order - b.sort_order) || (b.id - a.id));
                                 } else {
                                     this.notify('排序保存失败', 'error');
                                     this.loadNodes(); // 恢复原始顺序
