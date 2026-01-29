@@ -1140,12 +1140,12 @@
                             const newIndex = evt.newIndex;
                             if (oldIndex === newIndex) return;
 
-
+                            // 必须基于该分组当前的序列进行重排
                             const visibleNodes = [...this.nodesInGroup(groupName)];
                             const [movedItem] = visibleNodes.splice(oldIndex, 1);
                             visibleNodes.splice(newIndex, 0, movedItem);
 
-
+                            // 构建该分组内新的 sort_order 序列
                             const orders = visibleNodes.map((n, index) => ({
                                 id: n.id,
                                 sort_order: index
@@ -1155,19 +1155,20 @@
                                 const response = await this.api('/api/nodes/reorder', 'POST', { orders });
                                 if (response && response.status === 'ok') {
                                     this.notify('排序已保存', 'success');
-                                    // 立即同步本地状态
+                                    // 同步本地 nodes 数组中的 sort_order
                                     orders.forEach(o => {
                                         const node = this.nodes.find(nx => nx.id === o.id);
                                         if (node) node.sort_order = o.sort_order;
                                     });
+                                    // 全局排序逻辑：sort_order 升序，id 降序
                                     this.nodes.sort((a, b) => (a.sort_order - b.sort_order) || (b.id - a.id));
                                 } else {
                                     this.notify('排序保存失败', 'error');
-                                    this.loadNodes(); // 恢复原始顺序
+                                    await this.loadNodes();
                                 }
                             } catch (e) {
                                 this.notify('网络错误', 'error');
-                                this.loadNodes();
+                                await this.loadNodes();
                             }
                         }
                     });
