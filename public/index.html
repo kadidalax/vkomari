@@ -7,6 +7,7 @@
     <title>vKomari</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="dropdown_data.js"></script>
     <style>
         [x-cloak] {
@@ -192,6 +193,21 @@
                 transform: scale(1) translateY(0);
             }
         }
+
+        /* Drag & Drop Styles */
+        .sortable-ghost {
+            opacity: 0.3;
+            background: var(--accent-glow) !important;
+            border: 2px dashed var(--accent-main) !important;
+        }
+
+        .drag-handle {
+            cursor: grab;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
     </style>
 </head>
 
@@ -333,12 +349,13 @@
                         <div class="flex-1 h-px bg-gradient-to-r from-zinc-700/50 to-transparent ml-2"></div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+                        x-init="initSortable($el, group)">
                         <template x-for="n in nodesInGroup(group)" :key="n.id">
                             <div class="glass-card rounded-xl overflow-hidden node-card flex flex-col">
                                 <!-- Card Header -->
                                 <div
-                                    class="px-3 py-2.5 flex justify-between items-start border-b border-white/5 bg-white/[0.02]">
+                                    class="px-3 py-2.5 flex justify-between items-start border-b border-white/5 bg-white/[0.02] drag-handle">
                                     <div class="flex gap-2 min-w-0 flex-1">
                                         <div class="relative mt-1 flex-shrink-0">
                                             <div class="w-2 h-2 rounded-full"
@@ -1102,7 +1119,55 @@
                         this.loadNodes();
                         this.loadTemplates();
                         setInterval(() => { this.loadNodes(); this.loadTemplates(); }, 3000);
+                        this.$watch('nodes', () => {
+                            // Can perform actions when nodes list changes
+                        });
                     }
+                },
+
+                initSortable(el, groupName) {
+                    new Sortable(el, {
+                        animation: 150,
+                        handle: '.drag-handle',
+                        ghostClass: 'sortable-ghost',
+                        onEnd: async (evt) => {
+                            if (evt.oldIndex === evt.newIndex) return;
+
+                            // Get all nodes in this group
+                            const groupNodes = this.nodesInGroup(groupName);
+                            // Reorder them
+                            const movedItem = groupNodes.splice(evt.oldIndex, 1)[0];
+                            groupNodes.splice(evt.newIndex, 0, movedItem);
+
+                            // Update the nodes array while maintaining other groups
+                            const otherNodes = this.nodes.filter(n => (n.group_name || '') !== groupName);
+
+                            // Recalculate sort_order for all nodes
+                            // Here we use a global strategy: all nodes will have a sort_order
+                            // Nodes in other groups retain their relative order but might have adjusted indices
+                            const updatedNodes = [...otherNodes, ...groupNodes];
+
+                            // Sort primarily by group if you want to keep groups together in the DB,
+                            // or just assign new orders based on current visual order.
+                            // We'll update the sort_order of the MOVED items in this group.
+                            const orders = groupNodes.map((n, index) => ({
+                                id: n.id,
+                                sort_order: index
+                            }));
+
+                            try {
+                                const response = await this.api('/api/nodes/reorder', 'POST', { orders });
+                                if (response && response.status === 'ok') {
+                                    this.notify('排序已更新', 'success');
+                                    this.loadNodes(); // Refresh to ensure sync
+                                } else {
+                                    this.notify('排序保存失败', 'error');
+                                }
+                            } catch (e) {
+                                this.notify('网络错误', 'error');
+                            }
+                        }
+                    });
                 },
 
                 async validateToken() {
