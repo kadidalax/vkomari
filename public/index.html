@@ -1144,6 +1144,16 @@
                             const newIndex = evt.newIndex;
                             if (oldIndex === newIndex) return;
 
+                            // 关键修复：先撤销 SortableJS 的 DOM 操作
+                            // 因为 Alpine.js 使用 x-for 数据驱动，需要让它来重新渲染
+                            const item = evt.item;
+                            const parent = item.parentNode;
+                            if (oldIndex < newIndex) {
+                                parent.insertBefore(item, parent.children[oldIndex]);
+                            } else {
+                                parent.insertBefore(item, parent.children[oldIndex + 1]);
+                            }
+
                             // 必须基于该分组当前的序列进行重排
                             const visibleNodes = [...this.nodesInGroup(groupName)];
                             const [movedItem] = visibleNodes.splice(oldIndex, 1);
