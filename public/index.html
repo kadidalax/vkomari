@@ -325,7 +325,7 @@
             </div>
 
             <!-- 节点列表 (按分组显示) -->
-            <template x-for="group in displayedGroups" :key="group">
+            <template x-for="group in displayedGroups" :key="group + '-' + listKey">
                 <div class="mb-10 last:mb-0">
                     <div class="flex items-center gap-3 mb-5 group">
                         <div
@@ -1019,6 +1019,7 @@
                 showCountryList: false,
                 installScript: '',
                 isDragging: false,
+                listKey: 0, // 用于强制 x-for 重新渲染
 
                 // Toasts & Dialogs
                 toasts: [],
@@ -1166,14 +1167,14 @@
                                 if (response && response.status === 'ok') {
                                     this.notify('排序已保存', 'success');
                                     // 强制从服务器刷新数据，确保状态完全同步
-                                    await this.loadNodes();
+                                    await this.loadNodes(true);
                                 } else {
                                     this.notify('排序保存失败', 'error');
-                                    await this.loadNodes();
+                                    await this.loadNodes(true);
                                 }
                             } catch (e) {
                                 this.notify('网络错误', 'error');
-                                await this.loadNodes();
+                                await this.loadNodes(true);
                             }
                         }
                     });
@@ -1233,10 +1234,16 @@
 
                 start() { this.loadNodes(); setInterval(() => this.loadNodes(), 3000); },
 
-                async loadNodes() {
-                    if (this.token && !this.isDragging) {
+                async loadNodes(forceRefresh = false) {
+                    if (this.token && (!this.isDragging || forceRefresh)) {
                         const d = await this.api('/api/nodes');
-                        if (d) this.nodes = d;
+                        if (d) {
+                            this.nodes = d;
+                            if (forceRefresh) {
+                                // 强制刷新时递增 listKey，触发 x-for 完全重新渲染
+                                this.listKey++;
+                            }
+                        }
                     }
                 },
 
