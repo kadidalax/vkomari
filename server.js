@@ -57,7 +57,7 @@ var db = new sqlite3.Database(DB_PATH);
 
 db.serialize(function () {
     db.run('CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, color TEXT, sort_order INTEGER)');
-    db.run('CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, group_id INTEGER, server_address TEXT, client_secret TEXT, client_uuid TEXT, cpu_model TEXT, cpu_cores INTEGER, ram_total INTEGER, swap_total INTEGER, disk_total INTEGER, os TEXT, arch TEXT, virtualization TEXT, region TEXT, kernel_version TEXT, gpu_name TEXT, ipv4 TEXT, ipv6 TEXT, fake_ip TEXT, group_name TEXT, load_profile TEXT, cpu_min REAL, cpu_max REAL, mem_min REAL, mem_max REAL, swap_min REAL, swap_max REAL, disk_min REAL, disk_max REAL, net_min INTEGER, net_max INTEGER, conn_min INTEGER, conn_max INTEGER, proc_min INTEGER, proc_max INTEGER, report_interval INTEGER DEFAULT 3, enabled INTEGER DEFAULT 1, boot_time INTEGER DEFAULT 0, uptime_base INTEGER DEFAULT 0, traffic_reset_day INTEGER DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)');
+    db.run('CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, group_id INTEGER, server_address TEXT, client_secret TEXT, client_uuid TEXT, cpu_model TEXT, cpu_cores INTEGER, ram_total INTEGER, swap_total INTEGER, disk_total INTEGER, os TEXT, arch TEXT, virtualization TEXT, region TEXT, kernel_version TEXT, gpu_name TEXT, ipv4 TEXT, ipv6 TEXT, fake_ip TEXT, group_name TEXT, load_profile TEXT, cpu_min REAL, cpu_max REAL, mem_min REAL, mem_max REAL, swap_min REAL, swap_max REAL, disk_min REAL, disk_max REAL, net_min INTEGER, net_max INTEGER, conn_min INTEGER, conn_max INTEGER, proc_min INTEGER, proc_max INTEGER, report_interval INTEGER DEFAULT 3, enabled INTEGER DEFAULT 1, boot_time INTEGER DEFAULT 0, uptime_base INTEGER DEFAULT 0, traffic_reset_day INTEGER DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, sort_order INTEGER DEFAULT 0)');
 
     db.all('PRAGMA table_info(nodes)', function (err, rows) {
         if (!rows) return;
@@ -70,6 +70,9 @@ db.serialize(function () {
         }
         if (!rows.some(function (c) { return c.name === 'fake_ip'; })) {
             db.run('ALTER TABLE nodes ADD COLUMN fake_ip TEXT');
+        }
+        if (!rows.some(function (c) { return c.name === 'sort_order'; })) {
+            db.run('ALTER TABLE nodes ADD COLUMN sort_order INTEGER DEFAULT 0');
         }
     });
 
@@ -668,7 +671,7 @@ app.post('/api/change-password', auth, function (req, res) {
 });
 
 app.get('/api/nodes', auth, function (req, res) {
-    db.all('SELECT * FROM nodes ORDER BY id DESC', [], function (e, rows) {
+    db.all('SELECT * FROM nodes ORDER BY sort_order ASC, id DESC', [], function (e, rows) {
         if (e) return res.status(500).json({ error: e.message });
         var result = rows.map(function (r) {
             var status = activeAgents.has(r.id) ? activeAgents.get(r.id).status() : { online: false };
@@ -734,6 +737,33 @@ app.post('/api/batch', auth, function (req, res) {
         if (e) return res.status(500).json({ error: e.message });
         activeAgents.forEach(function (a) { a.update(Object.assign({}, a.config, { enabled: en })); });
         res.json({ status: 'ok' });
+    });
+});
+
+app.post('/api/nodes/reorder', auth, function (req, res) {
+    var orders = req.body.orders; // [{id, sort_order}]
+    if (!Array.isArray(orders)) return res.status(400).json({ error: 'Invalid data' });
+
+    var completed = 0;
+    var errorOccurred = false;
+
+    if (orders.length === 0) return res.json({ status: 'ok' });
+
+    orders.forEach(function (item) {
+        db.run('UPDATE nodes SET sort_order=? WHERE id=?', [item.sort_order, item.id], function (e) {
+            if (e) errorOccurred = true;
+            completed++;
+            if (completed === orders.length) {
+                if (errorOccurred) return res.status(500).json({ status: 'error' });
+                // Also update local agents' config
+                orders.forEach(function (o) {
+                    if (activeAgents.has(o.id)) {
+                        activeAgents.get(o.id).config.sort_order = o.sort_order;
+                    }
+                });
+                res.json({ status: 'ok' });
+            }
+        });
     });
 });
 
