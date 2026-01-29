@@ -1161,7 +1161,7 @@
                                         if (node) node.sort_order = o.sort_order;
                                     });
                                     // 全局排序逻辑：sort_order 升序，id 降序
-                                    this.nodes.sort((a, b) => (a.sort_order - b.sort_order) || (b.id - a.id));
+                                    this.nodes = [...this.nodes].sort((a, b) => (a.sort_order - b.sort_order) || (b.id - a.id));
                                 } else {
                                     this.notify('排序保存失败', 'error');
                                     await this.loadNodes();
