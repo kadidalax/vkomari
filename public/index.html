@@ -352,7 +352,8 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
                         x-init="initSortable($el, group)">
                         <template x-for="n in nodesInGroup(group)" :key="n.id">
-                            <div class="glass-card rounded-xl overflow-hidden node-card flex flex-col">
+                            <div class="glass-card rounded-xl overflow-hidden node-card flex flex-col"
+                                :data-node-id="n.id">
                                 <!-- Card Header -->
                                 <div
                                     class="px-3 py-2.5 flex justify-between items-start border-b border-white/5 bg-white/[0.02] drag-handle">
@@ -1144,40 +1145,28 @@
                             const newIndex = evt.newIndex;
                             if (oldIndex === newIndex) return;
 
-                            // 关键修复：先撤销 SortableJS 的 DOM 操作
-                            // 因为 Alpine.js 使用 x-for 数据驱动，需要让它来重新渲染
-                            const item = evt.item;
-                            const parent = item.parentNode;
-                            if (oldIndex < newIndex) {
-                                parent.insertBefore(item, parent.children[oldIndex]);
-                            } else {
-                                parent.insertBefore(item, parent.children[oldIndex + 1]);
+                            // 从 DOM 中读取当前实际的节点顺序（通过 data-node-id 属性）
+                            const parent = evt.item.parentNode;
+                            const nodeElements = parent.querySelectorAll('[data-node-id]');
+                            const orders = [];
+                            nodeElements.forEach((el, index) => {
+                                const nodeId = parseInt(el.getAttribute('data-node-id'));
+                                if (!isNaN(nodeId)) {
+                                    orders.push({ id: nodeId, sort_order: index });
+                                }
+                            });
+
+                            if (orders.length === 0) {
+                                this.notify('排序失败：无法读取节点', 'error');
+                                return;
                             }
-
-                            // 必须基于该分组当前的序列进行重排
-                            const visibleNodes = [...this.nodesInGroup(groupName)];
-                            const [movedItem] = visibleNodes.splice(oldIndex, 1);
-                            visibleNodes.splice(newIndex, 0, movedItem);
-
-                            // 构建该分组内新的 sort_order 序列
-                            const orders = visibleNodes.map((n, index) => ({
-                                id: n.id,
-                                sort_order: index
-                            }));
 
                             try {
                                 const response = await this.api('/api/nodes/reorder', 'POST', { orders });
                                 if (response && response.status === 'ok') {
                                     this.notify('排序已保存', 'success');
-                                    // 同步本地 nodes 数组中的 sort_order，并强制触发 Alpine.js 响应式更新
-                                    const updatedNodes = this.nodes.map(node => {
-                                        const orderInfo = orders.find(o => o.id === node.id);
-                                        if (orderInfo) {
-                                            return { ...node, sort_order: orderInfo.sort_order };
-                                        }
-                                        return node;
-                                    });
-                                    this.nodes = updatedNodes;
+                                    // 强制从服务器刷新数据，确保状态完全同步
+                                    await this.loadNodes();
                                 } else {
                                     this.notify('排序保存失败', 'error');
                                     await this.loadNodes();
