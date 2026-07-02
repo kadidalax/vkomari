@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   conn_max INTEGER DEFAULT 200,
   proc_min INTEGER DEFAULT 50,
   proc_max INTEGER DEFAULT 300,
-  report_interval INTEGER DEFAULT 3,
+  report_interval INTEGER DEFAULT 1,
   enabled INTEGER DEFAULT 1,
   boot_time INTEGER DEFAULT 0,
   uptime_base INTEGER DEFAULT 86400,

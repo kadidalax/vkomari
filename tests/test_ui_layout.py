@@ -27,6 +27,17 @@ def test_cards_use_saved_order_and_group_name_sort_buttons():
     assert "sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6" in text
 
 
+def test_default_intervals_are_komari_one_cfmonitor_three():
+    text = html()
+    assert "report_interval:1" in text
+    assert "this.form.report_interval=1" in text
+    assert "this.form.report_interval=3" in text
+    with open(os.path.join(ROOT, "scheduler.py"), encoding="utf-8") as f:
+        scheduler = f.read()
+    assert 'seconds=1' in scheduler
+
+
 if __name__ == "__main__":
     test_toolbar_filter_and_footer_layout_markers()
     test_cards_use_saved_order_and_group_name_sort_buttons()
+    test_default_intervals_are_komari_one_cfmonitor_three()

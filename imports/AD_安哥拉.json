@@ -1,0 +1,22 @@
+{
+  "name": "AD_安哥拉",
+  "group_name": "",
+  "os": "Debian GNU/Linux 12 (bookworm)",
+  "arch": "amd64",
+  "virtualization": "kvm",
+  "region": "AO",
+  "fake_ip": "155.89.0.1",
+  "cpu_model": "Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz",
+  "cpu_cores": 2,
+  "ram_total": 2048,
+  "swap_total": 512,
+  "disk_total": 20480,
+  "load_profile": "mid",
+  "report_interval": 1,
+  "traffic_reset_day": 1,
+  "komari_server": "",
+  "komari_token": "",
+  "komari_auto_discovery": "",
+  "report_enabled": true,
+  "enabled": true
+}

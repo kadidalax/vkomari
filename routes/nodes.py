@@ -15,6 +15,10 @@ def _random_uptime_base():
     return random.randint(1, 30) * 86400
 
 
+def _default_report_interval(data):
+    return 3 if data.get("cfmonitor_server") or data.get("cfmonitor_token") else 1
+
+
 def _list_nodes(request: Request):
     return get_nodes()
 
@@ -26,7 +30,7 @@ async def _create_node(request: Request):
     if d.get("fake_ip") is None:
         d["fake_ip"] = ""
     if not d.get("report_interval"):
-        d["report_interval"] = 3
+        d["report_interval"] = _default_report_interval(d)
     if not d.get("uptime_base"):
         d["uptime_base"] = _random_uptime_base()
     return save_node(d)
@@ -128,7 +132,7 @@ async def _import_nodes(request: Request):
             if not n.get("fake_ip"):
                 n["fake_ip"] = ""
             if not n.get("report_interval"):
-                n["report_interval"] = 3
+                n["report_interval"] = _default_report_interval(n)
             if not n.get("uptime_base"):
                 n["uptime_base"] = _random_uptime_base()
             values = [n.get(k) for k in fields]

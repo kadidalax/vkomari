@@ -123,8 +123,8 @@ async def _async_tick():
 def start_scheduler():
     _ensure_schema_safe()
     scheduler.add_job(
-        _sync_tick, "interval", seconds=3, id="vkomari_tick",
+        _sync_tick, "interval", seconds=1, id="vkomari_tick",
         max_instances=2, misfire_grace_time=30
     )
     scheduler.start()
-    print("[vKomari] Scheduler started (3s tick)")
+    print("[vKomari] Scheduler started (1s tick)")
