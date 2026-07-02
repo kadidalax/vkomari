@@ -19,6 +19,26 @@ def _default_report_interval(data):
     return 3 if data.get("cfmonitor_server") or data.get("cfmonitor_token") else 1
 
 
+def _norm_server(value):
+    return str(value or "").strip().rstrip("/")
+
+
+def _find_auto_discovery_import(db, node):
+    name = str(node.get("name") or "").strip()
+    server = _norm_server(node.get("komari_server"))
+    key = str(node.get("komari_auto_discovery") or "").strip()
+    if not (name and server and key and not node.get("komari_token")):
+        return None
+    rows = db.execute(
+        "SELECT * FROM nodes WHERE name = ? AND komari_auto_discovery = ?",
+        (name, key),
+    ).fetchall()
+    for row in rows:
+        if _norm_server(row["komari_server"]) == server:
+            return dict(row)
+    return None
+
+
 def _list_nodes(request: Request):
     return get_nodes()
 
@@ -122,12 +142,21 @@ async def _import_nodes(request: Request):
     nodes = body.get("nodes", [])
     if not isinstance(nodes, list):
         return JSONResponse({"error": "Invalid data"}, status_code=400)
+    nodes = sorted(nodes, key=lambda n: str((n or {}).get("name") or ""), reverse=True)
     db = get_db()
     fields = NODE_FIELDS
+    created = 0
+    updated = 0
     try:
         for n in nodes:
             n = normalize_node_data(n)
-            if not n.get("client_uuid"):
+            existing = _find_auto_discovery_import(db, n)
+            if existing:
+                if not n.get("komari_token"):
+                    n["komari_token"] = existing.get("komari_token")
+                if not n.get("client_uuid"):
+                    n["client_uuid"] = existing.get("client_uuid")
+            elif not n.get("client_uuid"):
                 n["client_uuid"] = str(uuid.uuid4())
             if not n.get("fake_ip"):
                 n["fake_ip"] = ""
@@ -136,9 +165,15 @@ async def _import_nodes(request: Request):
             if not n.get("uptime_base"):
                 n["uptime_base"] = _random_uptime_base()
             values = [n.get(k) for k in fields]
-            placeholders = ", ".join("?" for _ in fields)
-            db.execute(f"INSERT INTO nodes ({', '.join(fields)}) VALUES ({placeholders})", values)
+            if existing:
+                set_clause = ", ".join(f"{k} = ?" for k in fields)
+                db.execute(f"UPDATE nodes SET {set_clause} WHERE id = ?", values + [existing["id"]])
+                updated += 1
+            else:
+                placeholders = ", ".join("?" for _ in fields)
+                db.execute(f"INSERT INTO nodes ({', '.join(fields)}) VALUES ({placeholders})", values)
+                created += 1
         db.commit()
     finally:
         db.close()
-    return {"status": "ok", "count": len(nodes)}
+    return {"status": "ok", "count": len(nodes), "created": created, "updated": updated}

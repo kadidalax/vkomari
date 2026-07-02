@@ -1,6 +1,7 @@
 # Komari panel reporter: HTTP POST, sends every 1 second.
 import json
 import time
+import threading
 import httpx
 from urllib.parse import quote
 from agent import VirtualAgent
@@ -32,6 +33,8 @@ class KomariReporter:
         self.info_sent = False
         self.last_send_log_at = 0
         self.fail_count = 0
+        self._register_lock = threading.Lock()
+        self._registering = False
 
     @property
     def http_base(self) -> str:
@@ -48,6 +51,12 @@ class KomariReporter:
         key = str(self.config.get("komari_auto_discovery") or "").strip()
         if not key:
             return False
+        with self._register_lock:
+            if self.config.get("komari_token"):
+                return True
+            if self._registering:
+                return False
+            self._registering = True
         name = quote(str(self.config.get("name") or self.config.get("client_uuid") or "vkomari"), safe="")
         url = "{}/api/clients/register?name={}".format(self.http_base, name)
         try:
@@ -79,6 +88,9 @@ class KomariReporter:
             if self.fail_count <= 3:
                 print("[vKomari] {} auto-discovery failed: {}".format(self.log_name(), e))
             return False
+        finally:
+            with self._register_lock:
+                self._registering = False
 
     def _persist_auto_discovery_result(self, token: str, uuid: str):
         node_id = self.config.get("id")

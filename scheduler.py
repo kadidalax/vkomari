@@ -124,7 +124,7 @@ def start_scheduler():
     _ensure_schema_safe()
     scheduler.add_job(
         _sync_tick, "interval", seconds=1, id="vkomari_tick",
-        max_instances=2, misfire_grace_time=30
+        max_instances=1, misfire_grace_time=30
     )
     scheduler.start()
     print("[vKomari] Scheduler started (1s tick)")
