@@ -17,9 +17,11 @@ body{background:var(--bg);background-image:radial-gradient(at 0% 0%,rgba(124,58,
 .glass{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);box-shadow:0 4px 30px rgba(0,0,0,0.1)}
 .nc{background:rgba(24,24,27,0.55);border:1px solid rgba(63,63,70,0.25);transition:all .35s cubic-bezier(0.4,0,0.2,1)}
 .nc:hover{transform:translateY(-4px);border-color:rgba(124,58,237,0.35);background:rgba(30,30,35,0.75);box-shadow:0 20px 25px -5px rgba(0,0,0,0.3)}
+.nc .text-xs,.nc [class*="text-[7px]"],.nc [class*="text-[8px]"],.nc [class*="text-[9px]"]{font-size:11px;line-height:1rem}
+.nc [class*="text-[10px]"]{font-size:12px;line-height:1rem}
 .stat-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(63,63,70,0.15)}.stat-row:last-child{border-bottom:none}
-.stat-l{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#71717a;font-weight:600}
-.stat-v{font-size:11px;font-weight:500;font-family:'JetBrains Mono',monospace}
+.stat-l{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#71717a;font-weight:600}
+.stat-v{font-size:12px;font-weight:500;font-family:'JetBrains Mono',monospace}
 .toggle-bg:after{content:'';position:absolute;top:1.5px;left:1.5px;width:12px;height:12px;background:white;border-radius:50%;transition:.3s cubic-bezier(0.4,0,0.2,1);box-shadow:0 2px 4px rgba(0,0,0,.2)}
 input:checked+.toggle-bg:after{transform:translateX(.625rem)}
 input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%)}
@@ -56,10 +58,10 @@ input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 10
         <div class="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center text-violet-400 font-bold">V</div>
         <h1 class="text-xl font-bold">vKomari-CF</h1>
       </div>
-      <div class="flex flex-wrap gap-2">
-        <button @click="batchAction('start')" class="px-3 py-1.5 text-xs bg-violet-600/20 text-violet-400 hover:bg-violet-600/30 rounded border border-violet-600/20 transition">▶ 全部启动</button>
-        <button @click="batchAction('stop')" class="px-3 py-1.5 text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded border border-red-600/20 transition">⏸ 全部停止</button>
-        <div class="w-px h-6 bg-zinc-700 mx-1"></div>
+      <div data-ui="top-actions" class="ml-auto flex flex-wrap justify-end gap-2">
+        <a href="https://github.com/kadidalax/vkomari-cf" target="_blank" class="p-1.5 text-zinc-400 hover:text-white transition bg-zinc-700/50 hover:bg-zinc-700 rounded-lg" title="GitHub">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .32.21.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        </a>
         <button @click="exportNodes" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">导出</button>
         <button @click="$refs.importFile.click()" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">导入</button>
         <input type="file" x-ref="importFile" @change="importNodesFromFile" class="hidden" accept=".json" multiple>
@@ -67,39 +69,40 @@ input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 10
         <button @click="showPwdModal=true" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">改密</button>
         <button @click="showCFDiag()" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">CF诊断</button>
         <button @click="logout" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">退出</button>
-        <button @click="openModal()" class="px-4 py-1.5 text-xs bg-violet-600 hover:bg-violet-500 text-white rounded font-medium shadow-lg shadow-violet-900/20 transition flex items-center gap-1"><span class="text-lg leading-none">+</span> 添加节点</button>
-        <a href="https://github.com/kadidalax/vkomari-cf" target="_blank" class="ml-2 p-1.5 text-zinc-400 hover:text-white transition bg-zinc-700/50 hover:bg-zinc-700 rounded-lg" title="GitHub">
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .32.21.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-        </a>
       </div>
     </div>
   </header>
 
   <main class="w-[90vw] max-w-none mx-auto p-4 sm:p-6 flex-1 flex flex-col">
     <!-- Search & Filter -->
-    <div class="flex flex-wrap items-center gap-3 mb-6">
-      <button @click="searchOpen=!searchOpen;$nextTick(()=>searchOpen&&$refs.nodeSearch?.focus())" class="w-11 h-11 bg-zinc-800 border border-zinc-700 hover:border-violet-500 rounded-lg flex items-center justify-center text-zinc-300 transition" title="搜索节点">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg>
+    <div data-ui="filter-row" class="flex flex-wrap items-center gap-2 mb-3">
+      <button @click="searchOpen=!searchOpen;$nextTick(()=>searchOpen&&$refs.nodeSearch?.focus())" class="w-9 h-9 bg-zinc-800 border border-zinc-700 hover:border-violet-500 rounded-lg flex items-center justify-center text-zinc-300 transition" title="搜索节点">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg>
       </button>
       <div x-show="searchOpen" x-transition class="flex-1 min-w-[220px]">
         <input x-ref="nodeSearch" type="text" x-model="searchQuery" placeholder="搜索节点名称、地址、分组..." autocomplete="off"
-          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500 transition">
+          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 transition">
       </div>
-      <select x-model="activeGroup" class="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500">
+      <select x-model="activeGroup" class="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500">
         <option value="">所有分组</option>
         <template x-for="g in groups" :key="g"><option :value="g" x-text="g||'未分组'"></option></template>
       </select>
+      <button @click="batchAction('start')" class="px-3 py-2 text-xs bg-violet-600/20 text-violet-400 hover:bg-violet-600/30 rounded-lg border border-violet-600/20 transition">全部启动</button>
+      <button @click="batchAction('stop')" class="px-3 py-2 text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded-lg border border-red-600/20 transition">全部停止</button>
+      <button @click="openModal()" class="ml-auto px-4 py-2 text-xs bg-violet-600 hover:bg-violet-500 text-white rounded-lg font-medium shadow-lg shadow-violet-900/20 transition flex items-center gap-1"><span class="text-lg leading-none">+</span> 添加节点</button>
     </div>
 
     <!-- Group Sections -->
     <template x-for="group in displayedGroups" :key="group">
-      <div class="mb-8">
-        <div class="flex items-center gap-3 mb-3 cursor-pointer" @click="toggleCollapse(group)">
+      <div class="mb-5">
+        <div class="flex flex-wrap items-center gap-2 mb-2 cursor-pointer" @click="toggleCollapse(group)">
           <span class="text-zinc-500 transition-transform" :class="collapsedGroups[group] ? '-rotate-90' : ''">▼</span>
           <h2 class="text-sm font-bold uppercase tracking-wider text-zinc-400" x-text="group||'未分组'"></h2>
           <span class="text-xs text-zinc-600 bg-zinc-800 px-2 py-0.5 rounded-full" x-text="nodesInGroup(group).length"></span>
           <button x-show="group!==''" @click.stop="showRename(group)" class="text-zinc-600 hover:text-violet-400 text-xs ml-2">✏️</button>
-          <div class="ml-auto flex items-center gap-2" @click.stop>
+          <div class="flex flex-wrap items-center gap-1.5" @click.stop>
+            <button @click.stop="sortGroupByName(group,'asc')" class="px-2 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded transition" title="按名称正序">A-Z</button>
+            <button @click.stop="sortGroupByName(group,'desc')" class="px-2 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded transition" title="按名称倒序">Z-A</button>
             <template x-if="batchMode && nodesInGroup(group).some(n=>selectedNodes[n.id])">
               <div class="flex items-center gap-1.5">
                 <select x-model="batchTargetGroup" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-violet-500">
@@ -114,11 +117,11 @@ input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 10
             <button @click="toggleBatchGroup(group)" class="px-2 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded transition" x-text="batchMode && nodesInGroup(group).every(n=>selectedNodes[n.id]) ? '取消全选' : '批量操作'"></button>
           </div>
         </div>
-        <div x-show="!collapsedGroups[group]" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-2" :data-group="group">
+        <div x-show="!collapsedGroups[group]" class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7 gap-2" :data-group="group">
           <template x-for="n in nodesInGroup(group)" :key="n.id">
             <div class="glass rounded-xl overflow-hidden nc flex flex-col" :data-id="n.id">
               <!-- Card Header -->
-              <div class="px-2.5 py-1.5 flex justify-between items-start border-b border-white/5 bg-white/[0.02]">
+              <div class="px-3 py-2 flex justify-between items-start border-b border-white/5 bg-white/[0.02]">
                 <div class="flex gap-2 min-w-0 flex-1">
                   <input x-show="batchMode" type="checkbox" :checked="selectedNodes[n.id]" @change="$set(selectedNodes,n.id,$event.target.checked)" class="mt-1 accent-violet-500 flex-shrink-0">
                   <div class="relative mt-0.5 flex-shrink-0" x-show="!batchMode">
@@ -127,10 +130,10 @@ input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 10
                   </div>
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-1">
-                      <span class="font-semibold text-zinc-100 text-xs truncate" x-text="n.name"></span>
-                      <span class="text-xs" x-text="getFlag(n.region)"></span>
+                      <span class="font-semibold text-zinc-100 text-sm truncate" x-text="n.name"></span>
+                      <span class="text-sm" x-text="getFlag(n.region)"></span>
                     </div>
-                    <div class="text-[9px] text-zinc-500 font-mono truncate" x-text="n.server_address||'-'"></div>
+                    <div class="text-[11px] text-zinc-500 font-mono truncate" x-text="n.server_address||'-'"></div>
                   </div>
                 </div>
                 <div class="flex flex-col items-end gap-0.5 flex-shrink-0 ml-1">
@@ -138,13 +141,13 @@ input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 10
                     <input type="checkbox" class="sr-only peer" :checked="n.enabled" @change="toggleNode(n.id,$event.target.checked)">
                     <div class="toggle-bg w-7 h-4 bg-zinc-800 border border-white/10 rounded-full"></div>
                   </label>
-                  <span class="text-[7px] font-bold px-1 py-0.5 rounded border"
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded border"
                     :class="{'bg-violet-500/10 text-violet-400 border-violet-500/20':n.load_profile==='low','bg-amber-500/10 text-amber-400 border-amber-500/20':n.load_profile==='mid','bg-red-500/10 text-red-400 border-red-500/20':n.load_profile==='high'}"
                     x-text="n.load_profile||'mid'"></span>
                 </div>
               </div>
               <!-- Card Stats -->
-              <div class="px-2.5 py-1 flex-1 space-y-0">
+              <div class="px-3 py-1.5 flex-1 space-y-0">
                 <div class="stat-row"><span class="stat-l">配置</span><span class="text-[10px] font-mono text-violet-400" x-text="(n.cpu_cores||2)+'C / '+formatMB(n.ram_total||1024)"></span></div>
                 <div class="stat-row"><span class="stat-l">系统</span><span class="text-[10px] text-zinc-300 truncate max-w-[100px]" x-text="n.os||'Linux'"></span></div>
                 <div class="stat-row" x-show="n.group_name"><span class="stat-l">分组</span><span class="text-[9px] text-zinc-400 px-1 py-0.5 bg-zinc-800/80 rounded border border-zinc-700/50" x-text="n.group_name"></span></div>
@@ -158,7 +161,7 @@ input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 10
                 <div class="stat-row"><span class="stat-l">硬盘</span><span class="text-[10px] font-mono text-zinc-400" x-text="formatMB(n.disk_total||10240)"></span></div>
               </div>
               <!-- Card Footer -->
-              <div class="px-2.5 py-1.5 bg-zinc-900/40 border-t border-white/5 flex gap-1.5">
+              <div class="px-3 py-2 bg-zinc-900/40 border-t border-white/5 flex gap-1.5">
                 <button @click="editNode(n)" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-1 rounded-lg text-[10px] font-medium transition border border-zinc-700/50">配置</button>
                 <button @click="deleteNode(n.id)" class="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500/80 py-1 rounded-lg text-[10px] font-medium transition border border-red-500/10">删除</button>
               </div>
@@ -175,7 +178,7 @@ input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 10
     </div>
 
     <!-- Footer -->
-    <footer class="mt-auto pt-12 pb-8 text-center space-y-4">
+    <footer data-ui="footer-line" class="mt-auto pt-16 pb-4 flex items-center justify-center gap-4 text-center">
       <a href="https://github.com/kadidalax/vkomari-cf" target="_blank" class="text-zinc-500 hover:text-violet-400 transition inline-flex items-center gap-2 text-sm font-medium group">
         <div class="bg-zinc-800 p-2 rounded-full group-hover:bg-zinc-700 transition"><svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .32.21.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></div>
         <span>GitHub</span>
@@ -498,7 +501,7 @@ function app(){return{
   get groups(){const g=new Set(this.nodes.map(n=>n.group_name||''));return Array.from(g).sort()},
   get filteredNodes(){let f=this.nodes;if(this.activeGroup) f=f.filter(n=>(n.group_name||'')===this.activeGroup);if(this.searchQuery){const s=this.searchQuery.toLowerCase();f=f.filter(n=>n.name.toLowerCase().includes(s)||(n.server_address||'').toLowerCase().includes(s)||(n.group_name||'').toLowerCase().includes(s))}return f},
   get displayedGroups(){const v=new Set(this.filteredNodes.map(n=>n.group_name||''));return this.groups.filter(g=>v.has(g))},
-  nodesInGroup(g){return this.filteredNodes.filter(n=>(n.group_name||'')===g).sort((a,b)=>(a.name||'').localeCompare(b.name||''))},
+  nodesInGroup(g){return this.filteredNodes.filter(n=>(n.group_name||'')===g)},
   getFlag(c){if(!c)return'🏳';const r=this.dd.countries.find(x=>x.code===c.toUpperCase());return r?r.flag:'🏳'},
   getKernels(os){return this.dd.kernelMap[os]||this.dd.kernelMap['Ubuntu 24.04 LTS']||['5.15.0-generic']},
   onOsChange(){const k=this.getKernels(this.form.os);if(k.length&&!k.includes(this.form.kernel_version)) this.form.kernel_version=k[0]},
@@ -533,6 +536,15 @@ function app(){return{
     const ok=await this.showConfirm('批量删除','确定删除选中的 '+ids.length+' 个节点？此操作不可撤销！','danger','删除');
     if(!ok)return;
     try{await API.batchDelete(ids);await this.loadNodes();ids.forEach(id=>{this.selectedNodes[id]=false});this.batchMode=false;this.notify('已删除 '+ids.length+' 个节点','success')}catch(e){this.notify('删除失败: '+e.message,'error')}
+  },
+
+  async sortGroupByName(group,dir){
+    const sorted=[...this.nodes.filter(n=>(n.group_name||'')===group)].sort((a,b)=>{
+      const r=(a.name||'').localeCompare(b.name||'','zh-Hans');
+      return dir==='desc'?-r:r
+    });
+    const updates=sorted.map((n,i)=>({id:n.id,sort_order:i,group_name:group}));
+    try{await API.reorderNodes(updates);await this.loadNodes();this.notify(dir==='desc'?'已按名称倒序':'已按名称正序','success')}catch(e){this.notify('排序失败: '+e.message,'error')}
   },
 
   init(){
@@ -730,9 +742,13 @@ function app(){return{
   initDragDrop(){
     this.$nextTick(()=>{
       document.querySelectorAll('.grid[data-group]').forEach(grid=>{
+        if(grid._vkomariSortable)return;
+        grid._vkomariSortable=true;
         new Sortable(grid,{group:'nodes',animation:200,ghostClass:'opacity-30',onEnd:async(evt)=>{
-          const cards=[...grid.querySelectorAll('[data-id]')];
-          const updates=cards.map((c,i)=>({id:parseInt(c.dataset.id),sort_order:i,group_name:grid.dataset.group}));
+          const updates=[];
+          document.querySelectorAll('.grid[data-group]').forEach(g=>{
+            [...g.querySelectorAll('[data-id]')].forEach((c,i)=>updates.push({id:parseInt(c.dataset.id),sort_order:i,group_name:g.dataset.group}))
+          });
           try{await API.reorderNodes(updates);await this.loadNodes()}catch(e){this.notify('排序失败','error')}
         }})
       })
