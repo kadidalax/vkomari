@@ -1,0 +1,18 @@
+services:
+  vkomari:
+    build: .
+    container_name: vkomari
+    ports:
+      - "${PORT:-25770}:8000"
+    volumes:
+      - vkomari_data:/app/data
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-vkomari-secret-key-2026}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+      - http_proxy=${http_proxy:-}
+      - https_proxy=${https_proxy:-}
+    restart: unless-stopped
+
+volumes:
+  vkomari_data:

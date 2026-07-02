@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vKomari-CF — 虚拟探针管理器</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="js/data.js"></script>
+  <script type="module" src="js/ip.js"></script>
+  <script type="module" src="js/install.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <script src="js/api.js"></script>
+  <style>[x-cloak]{display:none!important}
+:root{--bg:#09090b;--card:rgba(23,23,26,0.65);--border:rgba(63,63,70,0.25);--accent:#7c3aed;--accent2:#a78bfa;--glow:rgba(124,58,237,0.25)}
+body{background:var(--bg);background-image:radial-gradient(at 0% 0%,rgba(124,58,237,0.07) 0px,transparent 50%),radial-gradient(at 100% 0%,rgba(168,85,247,0.04) 0px,transparent 50%),radial-gradient(at 50% 100%,rgba(59,130,246,0.03) 0px,transparent 50%);background-attachment:fixed;font-family:'Inter',system-ui,-apple-system,sans-serif;color:#e4e4e7}
+.glass{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);box-shadow:0 4px 30px rgba(0,0,0,0.1)}
+.nc{background:rgba(24,24,27,0.55);border:1px solid rgba(63,63,70,0.25);transition:all .35s cubic-bezier(0.4,0,0.2,1)}
+.nc:hover{transform:translateY(-4px);border-color:rgba(124,58,237,0.35);background:rgba(30,30,35,0.75);box-shadow:0 20px 25px -5px rgba(0,0,0,0.3)}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(63,63,70,0.15)}.stat-row:last-child{border-bottom:none}
+.stat-l{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#71717a;font-weight:600}
+.stat-v{font-size:11px;font-weight:500;font-family:'JetBrains Mono',monospace}
+.toggle-bg:after{content:'';position:absolute;top:1.5px;left:1.5px;width:12px;height:12px;background:white;border-radius:50%;transition:.3s cubic-bezier(0.4,0,0.2,1);box-shadow:0 2px 4px rgba(0,0,0,.2)}
+input:checked+.toggle-bg:after{transform:translateX(.625rem)}
+input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%)}
+.cs::-webkit-scrollbar{width:5px}.cs::-webkit-scrollbar-track{background:transparent}.cs::-webkit-scrollbar-thumb{background:rgba(63,63,70,.4);border-radius:10px}.cs::-webkit-scrollbar-thumb:hover{background:rgba(124,58,237,.4)}
+.toast-c{position:fixed;bottom:2rem;right:2rem;z-index:999;display:flex;flex-direction:column;gap:.75rem;pointer-events:none}
+.toast{pointer-events:auto;min-width:280px;max-width:400px;background:rgba(24,24,27,.9);backdrop-filter:blur(12px);border:1px solid rgba(63,63,70,.4);border-radius:12px;padding:1rem;display:flex;align-items:center;gap:.75rem;box-shadow:0 10px 15px -3px rgba(0,0,0,.3);animation:ti .3s cubic-bezier(0.16,1,0.3,1)}@keyframes ti{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast-ok{border-left:4px solid #22c55e}.toast-err{border-left:4px solid #ef4444}.toast-warn{border-left:4px solid #f59e0b}
+  </style>
+</head>
+<body class="min-h-screen" x-data="app()" x-cloak>
+
+<!-- Login -->
+<div x-show="!token" class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-sm">
+    <h1 class="text-4xl font-bold text-violet-400 text-center mb-2">🔮 vKomari-CF</h1>
+    <p class="text-zinc-500 text-center mb-6 text-sm">Komari + CF-VPS-Monitor 双面板虚拟探针</p>
+    <div class="glass rounded-xl p-6 shadow-xl">
+      <form @submit.prevent="login" class="space-y-4">
+        <input type="text" x-model="loginForm.username" autocomplete="username" placeholder="用户名" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500 transition">
+        <input type="password" x-model="loginForm.password" autocomplete="current-password" placeholder="密码" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500 transition">
+        <div x-show="sessionExpired" class="text-amber-300 text-sm text-center bg-amber-900/20 py-2 rounded">登录已过期，请重新登录</div>
+        <div x-show="loginError" class="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded" x-text="loginError"></div>
+        <button type="submit" class="w-full bg-violet-600 hover:bg-violet-500 text-white py-3 rounded-lg font-semibold transition shadow-lg shadow-violet-900/20">登 录</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div x-show="token" class="min-h-screen flex flex-col">
+  <header class="bg-zinc-800/90 backdrop-blur border-b border-zinc-700 sticky top-0 z-30 px-4 py-3">
+    <div class="w-[90vw] max-w-none mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center text-violet-400 font-bold">V</div>
+        <h1 class="text-xl font-bold">vKomari-CF</h1>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button @click="batchAction('start')" class="px-3 py-1.5 text-xs bg-violet-600/20 text-violet-400 hover:bg-violet-600/30 rounded border border-violet-600/20 transition">▶ 全部启动</button>
+        <button @click="batchAction('stop')" class="px-3 py-1.5 text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded border border-red-600/20 transition">⏸ 全部停止</button>
+        <div class="w-px h-6 bg-zinc-700 mx-1"></div>
+        <button @click="exportNodes" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">导出</button>
+        <button @click="$refs.importFile.click()" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">导入</button>
+        <input type="file" x-ref="importFile" @change="importNodesFromFile" class="hidden" accept=".json" multiple>
+        <div class="w-px h-6 bg-zinc-700 mx-1"></div>
+        <button @click="showPwdModal=true" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">改密</button>
+        <button @click="showCFDiag()" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">CF诊断</button>
+        <button @click="logout" class="px-3 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded transition">退出</button>
+        <button @click="openModal()" class="px-4 py-1.5 text-xs bg-violet-600 hover:bg-violet-500 text-white rounded font-medium shadow-lg shadow-violet-900/20 transition flex items-center gap-1"><span class="text-lg leading-none">+</span> 添加节点</button>
+        <a href="https://github.com/kadidalax/vkomari-cf" target="_blank" class="ml-2 p-1.5 text-zinc-400 hover:text-white transition bg-zinc-700/50 hover:bg-zinc-700 rounded-lg" title="GitHub">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .32.21.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="w-[90vw] max-w-none mx-auto p-4 sm:p-6 flex-1 flex flex-col">
+    <!-- Search & Filter -->
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+      <button @click="searchOpen=!searchOpen;$nextTick(()=>searchOpen&&$refs.nodeSearch?.focus())" class="w-11 h-11 bg-zinc-800 border border-zinc-700 hover:border-violet-500 rounded-lg flex items-center justify-center text-zinc-300 transition" title="搜索节点">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg>
+      </button>
+      <div x-show="searchOpen" x-transition class="flex-1 min-w-[220px]">
+        <input x-ref="nodeSearch" type="text" x-model="searchQuery" placeholder="搜索节点名称、地址、分组..." autocomplete="off"
+          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500 transition">
+      </div>
+      <select x-model="activeGroup" class="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500">
+        <option value="">所有分组</option>
+        <template x-for="g in groups" :key="g"><option :value="g" x-text="g||'未分组'"></option></template>
+      </select>
+    </div>
+
+    <!-- Group Sections -->
+    <template x-for="group in displayedGroups" :key="group">
+      <div class="mb-8">
+        <div class="flex items-center gap-3 mb-3 cursor-pointer" @click="toggleCollapse(group)">
+          <span class="text-zinc-500 transition-transform" :class="collapsedGroups[group] ? '-rotate-90' : ''">▼</span>
+          <h2 class="text-sm font-bold uppercase tracking-wider text-zinc-400" x-text="group||'未分组'"></h2>
+          <span class="text-xs text-zinc-600 bg-zinc-800 px-2 py-0.5 rounded-full" x-text="nodesInGroup(group).length"></span>
+          <button x-show="group!==''" @click.stop="showRename(group)" class="text-zinc-600 hover:text-violet-400 text-xs ml-2">✏️</button>
+          <div class="ml-auto flex items-center gap-2" @click.stop>
+            <template x-if="batchMode && nodesInGroup(group).some(n=>selectedNodes[n.id])">
+              <div class="flex items-center gap-1.5">
+                <select x-model="batchTargetGroup" class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-violet-500">
+                  <option value="" disabled selected>移动到...</option>
+                  <option value="">无分组</option>
+                  <template x-for="g2 in groups" :key="g2"><option :value="g2" x-text="g2||'未分组'"></option></template>
+                </select>
+                <button @click="batchMoveGroup(group)" class="px-2 py-1 text-xs bg-violet-600/20 text-violet-400 hover:bg-violet-600/30 rounded border border-violet-600/20 transition">移动</button>
+                <button @click="batchDeleteNodes(group)" class="px-2 py-1 text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded border border-red-600/20 transition">删除</button>
+              </div>
+            </template>
+            <button @click="toggleBatchGroup(group)" class="px-2 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded transition" x-text="batchMode && nodesInGroup(group).every(n=>selectedNodes[n.id]) ? '取消全选' : '批量操作'"></button>
+          </div>
+        </div>
+        <div x-show="!collapsedGroups[group]" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-2" :data-group="group">
+          <template x-for="n in nodesInGroup(group)" :key="n.id">
+            <div class="glass rounded-xl overflow-hidden nc flex flex-col" :data-id="n.id">
+              <!-- Card Header -->
+              <div class="px-2.5 py-1.5 flex justify-between items-start border-b border-white/5 bg-white/[0.02]">
+                <div class="flex gap-2 min-w-0 flex-1">
+                  <input x-show="batchMode" type="checkbox" :checked="selectedNodes[n.id]" @change="$set(selectedNodes,n.id,$event.target.checked)" class="mt-1 accent-violet-500 flex-shrink-0">
+                  <div class="relative mt-0.5 flex-shrink-0" x-show="!batchMode">
+                    <div class="w-2 h-2 rounded-full" :class="n.enabled ? 'bg-violet-400 shadow-[0_0_8px_rgba(124,58,237,0.8)]' : 'bg-zinc-600'"></div>
+                    <div x-show="n.enabled" class="absolute inset-0 w-2 h-2 rounded-full bg-violet-400 animate-ping opacity-60"></div>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1">
+                      <span class="font-semibold text-zinc-100 text-xs truncate" x-text="n.name"></span>
+                      <span class="text-xs" x-text="getFlag(n.region)"></span>
+                    </div>
+                    <div class="text-[9px] text-zinc-500 font-mono truncate" x-text="n.server_address||'-'"></div>
+                  </div>
+                </div>
+                <div class="flex flex-col items-end gap-0.5 flex-shrink-0 ml-1">
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" class="sr-only peer" :checked="n.enabled" @change="toggleNode(n.id,$event.target.checked)">
+                    <div class="toggle-bg w-7 h-4 bg-zinc-800 border border-white/10 rounded-full"></div>
+                  </label>
+                  <span class="text-[7px] font-bold px-1 py-0.5 rounded border"
+                    :class="{'bg-violet-500/10 text-violet-400 border-violet-500/20':n.load_profile==='low','bg-amber-500/10 text-amber-400 border-amber-500/20':n.load_profile==='mid','bg-red-500/10 text-red-400 border-red-500/20':n.load_profile==='high'}"
+                    x-text="n.load_profile||'mid'"></span>
+                </div>
+              </div>
+              <!-- Card Stats -->
+              <div class="px-2.5 py-1 flex-1 space-y-0">
+                <div class="stat-row"><span class="stat-l">配置</span><span class="text-[10px] font-mono text-violet-400" x-text="(n.cpu_cores||2)+'C / '+formatMB(n.ram_total||1024)"></span></div>
+                <div class="stat-row"><span class="stat-l">系统</span><span class="text-[10px] text-zinc-300 truncate max-w-[100px]" x-text="n.os||'Linux'"></span></div>
+                <div class="stat-row" x-show="n.group_name"><span class="stat-l">分组</span><span class="text-[9px] text-zinc-400 px-1 py-0.5 bg-zinc-800/80 rounded border border-zinc-700/50" x-text="n.group_name"></span></div>
+                <div class="stat-row"><span class="stat-l">面板</span>
+                  <span class="text-[9px] flex gap-1">
+                    <span x-show="n.komari_server" class="text-violet-400 bg-violet-500/10 px-1 py-0.5 rounded">Komari</span>
+                    <span x-show="n.cfmonitor_server" class="text-emerald-400 bg-emerald-500/10 px-1 py-0.5 rounded">CF</span>
+                    <span x-show="n.report_enabled" class="text-green-400 text-[8px]">📡</span>
+                  </span>
+                </div>
+                <div class="stat-row"><span class="stat-l">硬盘</span><span class="text-[10px] font-mono text-zinc-400" x-text="formatMB(n.disk_total||10240)"></span></div>
+              </div>
+              <!-- Card Footer -->
+              <div class="px-2.5 py-1.5 bg-zinc-900/40 border-t border-white/5 flex gap-1.5">
+                <button @click="editNode(n)" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-1 rounded-lg text-[10px] font-medium transition border border-zinc-700/50">配置</button>
+                <button @click="deleteNode(n.id)" class="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500/80 py-1 rounded-lg text-[10px] font-medium transition border border-red-500/10">删除</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Empty State -->
+    <div x-show="nodes.length===0" class="text-center py-20 text-zinc-500 bg-zinc-800/30 rounded-xl border border-zinc-700/50 border-dashed">
+      <p class="text-lg">暂无节点</p>
+      <p class="text-sm mt-2">点击右上角添加按钮创建一个新的虚拟节点</p>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-auto pt-12 pb-8 text-center space-y-4">
+      <a href="https://github.com/kadidalax/vkomari-cf" target="_blank" class="text-zinc-500 hover:text-violet-400 transition inline-flex items-center gap-2 text-sm font-medium group">
+        <div class="bg-zinc-800 p-2 rounded-full group-hover:bg-zinc-700 transition"><svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .32.21.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></div>
+        <span>GitHub</span>
+      </a>
+      <div class="text-zinc-600 text-[10px] uppercase tracking-[0.2em] font-bold">&copy; 2026 vKomari-CF</div>
+    </footer>
+  </main>
+</div>
+<!-- Edit Modal -->
+<div x-show="showModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50" style="display:none" x-transition.opacity>
+  <div class="glass rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+    <!-- Modal Header -->
+    <div class="p-5 border-b border-white/5 flex justify-between items-center bg-zinc-900/50 backdrop-blur-xl z-20">
+      <div class="flex items-center gap-4">
+        <div class="w-10 h-10 bg-violet-500/10 rounded-xl flex items-center justify-center text-violet-500">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold text-white" x-text="form.id ? '编辑节点配置' : '新建虚拟节点'"></h2>
+          <p class="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5" x-text="editingTemplateId ? '模板: '+editingTemplateName : 'Node Configuration'"></p>
+        </div>
+        <!-- Template Picker -->
+        <div class="relative ml-4" x-data="{open:false}">
+          <button @click="open=!open" class="text-xs bg-zinc-800 hover:bg-zinc-700 border border-white/5 px-4 py-1.5 rounded-lg text-zinc-300 transition flex items-center gap-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-.293.707L13 11.414V17a1 1 0 01-.447.894l-2 1A1 1 0 019 18v-6.586l-6.707-6.707A1 1 0 013 7V5z"/></svg>
+            模板库<span class="text-[10px] opacity-40" x-text="open?'▲':'▼'"></span>
+          </button>
+          <div x-show="open" @click.away="open=false" class="absolute left-0 mt-3 w-72 bg-zinc-900 glass rounded-2xl shadow-2xl z-50 overflow-hidden">
+            <div class="px-3 py-2 border-b border-white/5 bg-white/5 text-[10px] text-zinc-500 uppercase tracking-wider">点击应用模板 · 铅笔图标编辑</div>
+            <div class="max-h-60 overflow-y-auto p-2 space-y-1 cs">
+              <template x-for="t in templates" :key="t.id">
+                <div class="flex items-center group p-2.5 hover:bg-white/5 rounded-xl cursor-pointer transition">
+                  <div @click="applyTemplate(t);open=false" class="flex-1 min-w-0"><div class="text-sm font-medium text-zinc-200 truncate" x-text="t.name"></div><div class="text-[10px] text-zinc-500" x-text="(t.config.cpu_cores||2)+'C '+(t.config.ram_total||1024)+'MB'"></div></div>
+                  <button @click.stop="editTemplate(t)" class="text-zinc-600 hover:text-violet-400 p-1.5 opacity-0 group-hover:opacity-100 transition" title="编辑模板"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                  <button @click.stop="deleteTemplate(t.id)" class="text-zinc-600 hover:text-red-400 p-1.5 opacity-0 group-hover:opacity-100 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                </div>
+              </template>
+              <div x-show="templates.length===0" class="text-center text-zinc-500 text-xs py-4">暂无模板</div>
+            </div>
+          </div>
+        </div>
+        <button @click="refreshLoad()" type="button" class="text-xs bg-zinc-800 hover:bg-zinc-700 border border-white/5 px-3 py-1.5 rounded-lg text-zinc-300 transition flex items-center gap-2" title="只刷新负载区间，不改变节点配置">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 0 0 19 5M19 5h-5M5 19h5"/></svg>
+          刷新负载
+        </button>
+      </div>
+      <button @click="showModal=false" class="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-700 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <!-- Modal Body -->
+    <div class="p-6 overflow-y-auto flex-1 cs space-y-5">
+      <!-- Section: Basic -->
+      <div>
+        <h3 class="text-xs font-bold text-violet-400 uppercase tracking-widest mb-3 flex items-center gap-2"><span class="w-1 h-4 bg-violet-500 rounded-full"></span>基础信息</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-[10px] text-zinc-500 uppercase">名称</label><input x-model="form.name" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div>
+            <label class="text-[10px] text-zinc-500 uppercase">分组</label>
+            <div class="relative mt-1" x-data="{grpOpen:false}">
+              <input type="text" x-model="form.group_name" @focus="grpOpen=true" @blur="setTimeout(()=>grpOpen=false,150)" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none pr-8" placeholder="输入新分组或选择已有">
+              <button type="button" @click="grpOpen=!grpOpen" class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 pointer-events-auto">
+                <svg class="w-4 h-4 transition-transform" :class="grpOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <div x-show="grpOpen" class="absolute z-50 left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl max-h-40 overflow-y-auto cs">
+                <div @click="form.group_name='';grpOpen=false" class="px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-700 cursor-pointer">无分组</div>
+                <template x-for="g in groups" :key="g">
+                  <div x-show="g" @click="form.group_name=g;grpOpen=false" class="px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 cursor-pointer" x-text="g"></div>
+                </template>
+              </div>
+            </div>
+          </div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">地区</label>
+            <div class="relative mt-1" x-data="{open:false}">
+              <div @click="open=!open" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm cursor-pointer flex items-center gap-2"><span x-text="getFlag(form.region)"></span><span x-text="form.region||'CN'"></span></div>
+              <div x-show="open" @click.away="open=false" class="absolute z-30 w-full mt-1 bg-zinc-900 glass rounded-lg max-h-48 overflow-y-auto cs">
+                <input type="text" x-model="countrySearch" placeholder="搜索..." class="w-full bg-zinc-800 border-b border-zinc-700 px-3 py-2 text-xs focus:outline-none sticky top-0">
+                <template x-for="c in dd.countries.filter(x=>countrySearch?x.name.toLowerCase().includes(countrySearch.toLowerCase())||x.code.toLowerCase().includes(countrySearch.toLowerCase()):true)"><div @click="form.region=c.code;countrySearch='';generateIpForRegion(c.code);open=false" class="px-3 py-1.5 text-xs hover:bg-white/5 cursor-pointer flex items-center gap-2"><span x-text="c.flag"></span><span x-text="c.name+' ('+c.code+')'"></span></div></template>
+              </div>
+            </div>
+          </div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">OS</label><select x-model="form.os" @change="onOsChange()" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"><template x-for="o in dd.os"><option :value="o.value" x-text="o.label"></option></template></select></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">架构</label><select x-model="form.arch" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"><template x-for="a in dd.arch"><option :value="a.value" x-text="a.label"></option></template></select></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">虚拟化</label><select x-model="form.virtualization" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"><template x-for="v in dd.virtualization"><option :value="v.value" x-text="v.label"></option></template></select></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">内核版本</label><select x-model="form.kernel_version" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"><template x-for="k in getKernels(form.os)"><option :value="k" x-text="k"></option></template></select></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">伪造IP</label><input x-model="form.fake_ip" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1" placeholder="203.0.113.5"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">CPU型号</label><select x-model="form.cpu_model" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"><template x-for="cpu in dd.cpuModels"><option :value="cpu.value" x-text="cpu.label"></option></template></select></div>
+        </div>
+      </div>
+      <!-- Section: Hardware -->
+      <div>
+        <h3 class="text-xs font-bold text-violet-400 uppercase tracking-widest mb-3 flex items-center gap-2"><span class="w-1 h-4 bg-violet-500 rounded-full"></span>硬件配置</h3>
+        <div class="grid grid-cols-3 gap-3">
+          <div><label class="text-[10px] text-zinc-500 uppercase">CPU核心</label><input type="number" x-model="form.cpu_cores" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">内存</label><div class="flex mt-1"><input type="number" x-model.number="form.ram_total" class="w-full bg-zinc-800 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none"><button @click="toggleUnit('ram')" class="bg-zinc-700 border-y border-r border-zinc-600 px-2 text-xs rounded-r-lg hover:bg-zinc-600 transition" x-text="form.ram_unit"></button></div></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">Swap</label><div class="flex mt-1"><input type="number" x-model.number="form.swap_total" class="w-full bg-zinc-800 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none"><button @click="toggleUnit('swap')" class="bg-zinc-700 border-y border-r border-zinc-600 px-2 text-xs rounded-r-lg hover:bg-zinc-600 transition" x-text="form.swap_unit"></button></div></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">硬盘</label><div class="flex mt-1"><input type="number" x-model.number="form.disk_total" class="w-full bg-zinc-800 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none"><button @click="toggleUnit('disk')" class="bg-zinc-700 border-y border-r border-zinc-600 px-2 text-xs rounded-r-lg hover:bg-zinc-600 transition" x-text="form.disk_unit"></button></div></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">负载模式</label><select x-model="form.load_profile" @change="applyPreset()" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"><option value="low">低负载</option><option value="mid">中等</option><option value="high">高负载</option></select></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">GPU型号</label><select x-model="form.gpu_name" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"><template x-for="gpu in dd.gpuModels"><option :value="gpu.value" x-text="gpu.label"></option></template></select></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">开机日期</label><input type="date" x-model="form.boot_date" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">月流量重置日</label><input type="number" x-model="form.traffic_reset_day" min="1" max="28" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+        </div>
+      </div>
+      <!-- Section: Simulation Range -->
+      <div>
+        <h3 class="text-xs font-bold text-violet-400 uppercase tracking-widest mb-3 flex items-center gap-2"><span class="w-1 h-4 bg-violet-500 rounded-full"></span>模拟波动范围</h3>
+        <div class="grid grid-cols-3 gap-3">
+          <div><label class="text-[10px] text-zinc-500 uppercase">CPU最低%</label><input type="number" x-model="form.cpu_min" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">CPU最高%</label><input type="number" x-model="form.cpu_max" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">内存最低%</label><input type="number" x-model="form.mem_min" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">内存最高%</label><input type="number" x-model="form.mem_max" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">Swap最低%</label><input type="number" x-model="form.swap_min" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">Swap最高%</label><input type="number" x-model="form.swap_max" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">磁盘最低%</label><input type="number" x-model="form.disk_min" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">磁盘最高%</label><input type="number" x-model="form.disk_max" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">网速最低</label><div class="flex mt-1"><input type="number" x-model.number="form.net_min" class="w-full bg-zinc-800 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none"><button @click="toggleUnit('net')" class="bg-zinc-700 border-y border-r border-zinc-600 px-2 text-xs rounded-r-lg hover:bg-zinc-600 transition" x-text="form.net_unit"></button></div></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">网速最高</label><div class="flex mt-1"><input type="number" x-model.number="form.net_max" class="w-full bg-zinc-800 border border-zinc-700 rounded-l-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none"><button @click="toggleUnit('net')" class="bg-zinc-700 border-y border-r border-zinc-600 px-2 text-xs rounded-r-lg hover:bg-zinc-600 transition" x-text="form.net_unit"></button></div></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">连接最低</label><input type="number" x-model="form.conn_min" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">连接最高</label><input type="number" x-model="form.conn_max" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">进程最低</label><input type="number" x-model="form.proc_min" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">进程最高</label><input type="number" x-model="form.proc_max" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">上报间隔(秒)</label><input type="number" x-model="form.report_interval" min="1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+        </div>
+      </div>
+      <!-- Section: One-Key Parse -->
+      <div>
+        <h3 class="text-xs font-bold text-violet-400 uppercase tracking-widest mb-3 flex items-center gap-2"><span class="w-1 h-4 bg-violet-500 rounded-full"></span>一键解析安装脚本</h3>
+        <textarea x-model="installScript" @paste="setTimeout(()=>parseScript(),100)" placeholder="粘贴 Komari 或 CF-VPS-Monitor 的安装命令..." class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs font-mono focus:border-violet-500 focus:outline-none h-16"></textarea>
+        <div class="flex gap-2 mt-2"><button @click="parseScript()" class="bg-zinc-700 hover:bg-zinc-600 text-xs px-3 py-1 rounded transition">🔍 解析</button><span class="text-xs text-zinc-500 mt-1" x-text="parseResult"></span></div>
+      </div>
+      <!-- Section: Panel Targets -->
+      <div>
+        <h3 class="text-xs font-bold text-violet-400 uppercase tracking-widest mb-3 flex items-center gap-2"><span class="w-1 h-4 bg-violet-500 rounded-full"></span>面板目标</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2"><label class="text-[10px] text-violet-300 uppercase font-bold">🎯 Komari 面板</label></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">服务器地址</label><input x-model="form.komari_server" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1" placeholder="https://komari.example.com"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">Token</label><input x-model="form.komari_token" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+          <div class="col-span-2 mt-2"><label class="text-[10px] text-emerald-300 uppercase font-bold">🎯 CF-VPS-Monitor 面板</label></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">Worker 地址</label><input x-model="form.cfmonitor_server" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1" placeholder="https://cf-vps-monitor.example.workers.dev"></div>
+          <div><label class="text-[10px] text-zinc-500 uppercase">Token</label><input x-model="form.cfmonitor_token" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
+        </div>
+      </div>
+      <!-- Section: Status -->
+      <div class="flex items-center gap-6 pt-2 border-t border-white/5">
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" x-model="form.enabled" checked> 节点启用</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" x-model="form.report_enabled"> 数据上报</label>
+        <div class="flex-1"></div>
+        <div class="text-[10px] text-zinc-500" x-show="form.group_name" x-text="'分组: '+form.group_name"></div>
+      </div>
+    </div>
+    <!-- Modal Footer -->
+    <div class="p-4 border-t border-white/5 bg-zinc-900/30 flex justify-between items-center">
+      <button @click="deleteNode(form.id)" x-show="form.id" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-lg text-sm transition">删除节点</button>
+      <div class="flex gap-2 ml-auto items-center">
+        <button @click="saveTemplateCurrent()" class="bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 px-4 py-2 rounded-lg text-sm transition border border-amber-600/20">保存模板</button>
+        <button @click="openSaveTplModal()" class="bg-zinc-700/50 hover:bg-zinc-600 text-zinc-300 px-4 py-2 rounded-lg text-sm transition border border-zinc-600/30">另存模板</button>
+        <button @click="showModal=false" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-sm transition">取消</button>
+        <button @click="saveNode()" class="bg-violet-600 hover:bg-violet-500 text-white px-6 py-2 rounded-lg text-sm font-bold transition shadow-lg shadow-violet-900/20">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CF Monitor Diagnostic Modal -->
+<div x-show="showCFDiagModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50" x-transition.opacity @keydown.escape.window="showCFDiagModal=false">
+  <div class="glass rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto cs">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-zinc-100">CF Monitor 诊断</h3>
+      <div class="flex gap-2">
+        <button @click="showCFDiag()" class="text-xs bg-zinc-700 hover:bg-zinc-600 text-zinc-300 px-3 py-1.5 rounded transition">刷新</button>
+        <button @click="showCFDiagModal=false" class="text-zinc-500 hover:text-zinc-300 text-sm">✕</button>
+      </div>
+    </div>
+    <div x-show="!cfDiagData" class="text-center py-8 text-zinc-500 text-sm">加载中...</div>
+    <div x-show="cfDiagData && cfDiagData.reporters.length === 0" class="text-center py-8 text-zinc-500 text-sm">
+      暂无CF Monitor上报器。<br>可能原因: 1)没有配置cfmonitor_server和token的节点 2)Cron尚未运行(每分钟一次)
+    </div>
+    <template x-if="cfDiagData && cfDiagData.reporters.length > 0">
+      <div class="space-y-2">
+        <div class="text-[10px] text-zinc-500 mb-2" x-text="'服务器时间: ' + new Date(cfDiagData.serverTime).toLocaleTimeString()"></div>
+        <template x-for="r in cfDiagData.reporters" :key="r.name">
+          <div class="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700/30">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-sm font-medium text-zinc-200" x-text="r.name"></span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                :class="{'bg-green-500/10 text-green-400': r.wsState==='open', 'bg-red-500/10 text-red-400': r.wsState==='error'||r.wsState==='no_socket', 'bg-amber-500/10 text-amber-400': r.wsState==='timeout'||r.wsState==='closed', 'bg-zinc-700 text-zinc-400': r.wsState==='connecting'}"
+                x-text="r.wsState"></span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                :class="{'bg-green-500/10 text-green-400': r.wsState==='open' && r.sendCount > 0, 'bg-amber-500/10 text-amber-400': r.wsState!=='open', 'bg-zinc-700 text-zinc-400': r.wsState==='open' && r.sendCount === 0}"
+                x-text="r.wsState==='open' && r.sendCount > 0 ? 'reporting' : 'idle'"></span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-mono" :class="r.usingServiceBinding ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-700 text-zinc-400'" x-text="r.usingServiceBinding ? 'binding' : 'fetch'"></span>
+            </div>
+            <div class="grid grid-cols-2 gap-1 text-[11px] text-zinc-500 font-mono">
+              <div>发送次数: <span class="text-zinc-300" x-text="r.sendCount"></span></div>
+              <div>接收次数: <span class="text-zinc-300" :class="{'text-red-400': r.recvCount === 0}" x-text="r.recvCount"></span></div>
+              <div>上次发送: <span class="text-zinc-300" x-text="r.lastSendAge >= 0 ? Math.round(r.lastSendAge/1000)+'s前' : '从未'"></span></div>
+              <div>上次policy: <span class="text-zinc-300" x-text="r.lastPolicyAge >= 0 ? Math.round(r.lastPolicyAge/1000)+'s前' : '从未'"></span></div>
+              <div x-show="r.wsError" class="col-span-2 text-red-400">错误: <span x-text="r.wsError"></span></div>
+              <div x-show="r.wsUrl" class="col-span-2 text-zinc-600 truncate">URL: <span x-text="r.wsUrl"></span></div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+</div>
+
+<!-- Import Group Selector Modal -->
+<div x-show="showImportGroupModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50" x-transition.opacity @keydown.escape.window="showImportGroupModal=false">
+  <div class="glass rounded-2xl p-6 w-full max-w-sm">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+        <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-zinc-100">导入节点</h3>
+        <p class="text-[11px] text-zinc-500" x-text="pendingImportNodes ? '即将导入 ' + pendingImportNodes.length + ' 个节点' : ''"></p>
+      </div>
+    </div>
+    <label class="text-[10px] text-zinc-500 uppercase mb-2 block">选择分组方式</label>
+    <div class="space-y-2 mb-4">
+      <label class="flex items-center gap-2 p-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 cursor-pointer transition border border-zinc-700/30" :class="importGroupForm.mode==='none' ? 'border-violet-500/40 bg-violet-500/5' : ''">
+        <input type="radio" x-model="importGroupForm.mode" value="none" class="text-violet-500"><span class="text-sm text-zinc-300">不分组（默认）</span>
+      </label>
+      <label class="flex items-center gap-2 p-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 cursor-pointer transition border border-zinc-700/30" :class="importGroupForm.mode==='existing' ? 'border-violet-500/40 bg-violet-500/5' : ''">
+        <input type="radio" x-model="importGroupForm.mode" value="existing" class="text-violet-500"><span class="text-sm text-zinc-300">选择已有分组</span>
+      </label>
+      <div x-show="importGroupForm.mode==='existing'" class="pl-6">
+        <select x-model="importGroupForm.groupName" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none">
+          <option value="">请选择...</option>
+          <template x-for="g in groups" :key="g"><option :value="g" x-text="g||'未分组'"></option></template>
+        </select>
+      </div>
+      <label class="flex items-center gap-2 p-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 cursor-pointer transition border border-zinc-700/30" :class="importGroupForm.mode==='new' ? 'border-violet-500/40 bg-violet-500/5' : ''">
+        <input type="radio" x-model="importGroupForm.mode" value="new" class="text-violet-500"><span class="text-sm text-zinc-300">新建分组</span>
+      </label>
+      <div x-show="importGroupForm.mode==='new'" class="pl-6">
+        <input type="text" x-model="importGroupForm.newGroup" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none" placeholder="输入新分组名称" x-ref="newGroupInput">
+      </div>
+    </div>
+    <div class="flex gap-2 justify-end">
+      <button @click="cancelImport()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-4 py-2 rounded-lg text-sm transition">取消</button>
+      <button @click="confirmImport()" class="bg-violet-600 hover:bg-violet-500 text-white px-5 py-2 rounded-lg text-sm font-bold transition shadow-lg shadow-violet-900/20">导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save Template As Modal -->
+<div x-show="showSaveTplModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50" x-transition.opacity @keydown.escape.window="showSaveTplModal=false">
+  <div class="glass rounded-2xl p-6 w-full max-w-sm" @click.away="showSaveTplModal=false">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+        <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h6.586A2 2 0 0115 3.586L19.414 8A2 2 0 0120 9.414V19a2 2 0 01-2 2H7a2 2 0 01-2-2V5z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3v6h6"/></svg>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-zinc-100">另存为模板</h3>
+        <p class="text-[11px] text-zinc-500">保存当前配置为新模板</p>
+      </div>
+    </div>
+    <input type="text" x-model="saveTplName" @keydown.enter="saveTemplateAs()" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm focus:border-amber-500 focus:outline-none mb-4" placeholder="输入模板名称..." x-ref="saveTplInput">
+    <div class="flex gap-2 justify-end">
+      <button @click="showSaveTplModal=false" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-4 py-2 rounded-lg text-sm transition">取消</button>
+      <button @click="saveTemplateAs()" class="bg-amber-600 hover:bg-amber-500 text-white px-5 py-2 rounded-lg text-sm font-bold transition shadow-lg shadow-amber-900/20">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Password Modal -->
+<div x-show="showPwdModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50" x-transition.opacity>
+  <div class="glass rounded-2xl p-6 w-full max-w-sm">
+    <h3 class="text-lg font-bold mb-4">修改密码</h3>
+    <input type="password" x-model="newPassword" placeholder="新密码（至少6位）" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-sm focus:border-violet-500 focus:outline-none mb-3">
+    <div class="flex gap-2 justify-end">
+      <button @click="showPwdModal=false" class="bg-zinc-700 hover:bg-zinc-600 px-4 py-2 rounded-lg text-sm transition">取消</button>
+      <button @click="changePassword()" class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-sm transition">确认</button>
+    </div>
+    <div x-show="isDefaultPwd" class="mt-3 text-amber-400 text-xs">⚠ 您正在使用默认密码，请立即修改！</div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div x-show="confirmDialog.show" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[60]" x-transition.opacity>
+  <div class="glass rounded-2xl p-6 w-full max-w-sm text-center">
+    <div class="text-3xl mb-3" x-text="confirmDialog.type==='danger'?'⚠':confirmDialog.type==='success'?'✅':'ℹ'"></div>
+    <h3 class="text-lg font-bold mb-1" x-text="confirmDialog.title"></h3>
+    <p class="text-zinc-400 text-sm mb-4" x-text="confirmDialog.message"></p>
+    <div class="flex gap-2 justify-center">
+      <button x-show="confirmDialog.isConfirm" @click="confirmDialog.onCancel()" class="bg-zinc-700 hover:bg-zinc-600 px-6 py-2 rounded-lg text-sm transition">取消</button>
+      <button @click="confirmDialog.onConfirm()" :class="confirmDialog.type==='danger'?'bg-red-600 hover:bg-red-500':'bg-violet-600 hover:bg-violet-500'" class="text-white px-6 py-2 rounded-lg text-sm transition shadow-lg" x-text="confirmDialog.confirmText"></button>
+    </div>
+  </div>
+</div>
+<!-- Toast Container -->
+<div class="toast-c"><template x-for="t in toasts" :key="t.id"><div :class="'toast toast-'+t.type"><span x-text="t.type==='success'?'✅':t.type==='error'?'❌':'ℹ'"></span><span class="text-sm" x-text="t.message"></span></div></template></div>
+
+<!-- Alpine.js App Logic -->
+<script>
+function app(){return{
+  token:localStorage.getItem('vkomari_token')||'',
+  loginForm:{username:'admin',password:''},loginError:'',sessionExpired:false,
+  nodes:[],showModal:false,showPwdModal:false,isDefaultPwd:false,newPassword:'',
+  form:{},countrySearch:'',installScript:'',parseResult:'',
+  toasts:[],searchQuery:'',searchOpen:false,activeGroup:'',newTemplateName:'',
+  collapsedGroups:{},templates:[],
+  selectedNodes:{},batchMode:false,batchTargetGroup:'',
+  confirmDialog:{show:false,title:'',message:'',type:'info',isConfirm:false,confirmText:'确定',onConfirm:()=>{},onCancel:()=>{}},
+  showRenameModal:false,renameForm:{oldName:'',newName:''},
+  showCFDiagModal:false,cfDiagData:null,
+  showImportGroupModal:false,importGroupForm:{mode:'none',groupName:'',newGroup:''},pendingImportNodes:null,
+  editingTemplateId:null,editingTemplateName:'',
+  showSaveTplModal:false,saveTplName:'',
+  dd:DROPDOWN_DATA,
+
+  notify(msg,type){const id=Date.now();this.toasts.push({id,message:msg,type});setTimeout(()=>{this.toasts=this.toasts.filter(t=>t.id!==id)},3000)},
+
+  showConfirm(title,msg,type,confirmText){
+    return new Promise(resolve=>{this.confirmDialog={show:true,title,message:msg,type:type||'info',isConfirm:true,confirmText:confirmText||'确定',onConfirm:()=>{this.confirmDialog.show=false;resolve(true)},onCancel:()=>{this.confirmDialog.show=false;resolve(false)}}})},
+
+  showAlert(title,msg,type){
+    return new Promise(resolve=>{this.confirmDialog={show:true,title,message:msg,type:type||'info',isConfirm:false,confirmText:'知道了',onConfirm:()=>{this.confirmDialog.show=false;resolve()}}})},
+
+  get groups(){const g=new Set(this.nodes.map(n=>n.group_name||''));return Array.from(g).sort()},
+  get filteredNodes(){let f=this.nodes;if(this.activeGroup) f=f.filter(n=>(n.group_name||'')===this.activeGroup);if(this.searchQuery){const s=this.searchQuery.toLowerCase();f=f.filter(n=>n.name.toLowerCase().includes(s)||(n.server_address||'').toLowerCase().includes(s)||(n.group_name||'').toLowerCase().includes(s))}return f},
+  get displayedGroups(){const v=new Set(this.filteredNodes.map(n=>n.group_name||''));return this.groups.filter(g=>v.has(g))},
+  nodesInGroup(g){return this.filteredNodes.filter(n=>(n.group_name||'')===g).sort((a,b)=>(a.name||'').localeCompare(b.name||''))},
+  getFlag(c){if(!c)return'🏳';const r=this.dd.countries.find(x=>x.code===c.toUpperCase());return r?r.flag:'🏳'},
+  getKernels(os){return this.dd.kernelMap[os]||this.dd.kernelMap['Ubuntu 24.04 LTS']||['5.15.0-generic']},
+  onOsChange(){const k=this.getKernels(this.form.os);if(k.length&&!k.includes(this.form.kernel_version)) this.form.kernel_version=k[0]},
+
+  toggleCollapse(g){this.collapsedGroups[g]=!this.collapsedGroups[g];try{localStorage.setItem('vkomari_collapsed',JSON.stringify(this.collapsedGroups))}catch(e){}},
+
+  toggleBatchGroup(g){
+    const nodes=this.nodesInGroup(g);
+    const allSelected=nodes.every(n=>this.selectedNodes[n.id]);
+    if(allSelected){nodes.forEach(n=>{this.selectedNodes[n.id]=false})}
+    else{nodes.forEach(n=>{this.selectedNodes[n.id]=true})}
+    this.batchMode=true;
+    this.selectedNodes={...this.selectedNodes};
+    if(!Object.values(this.selectedNodes).some(v=>v))this.batchMode=false
+  },
+
+  getSelectedIds(group){
+    const nodes=this.nodesInGroup(group);
+    return nodes.filter(n=>this.selectedNodes[n.id]).map(n=>n.id)
+  },
+
+  async batchMoveGroup(group){
+    const ids=this.getSelectedIds(group);
+    if(!ids.length){this.notify('请先选择节点','error');return}
+    const target=this.batchTargetGroup;
+    try{await API.reorderNodes(ids.map(id=>({id,group_name:target})));await this.loadNodes();ids.forEach(id=>{this.selectedNodes[id]=false});this.batchMode=false;this.notify('已移动 '+ids.length+' 个节点','success')}catch(e){this.notify('移动失败: '+e.message,'error')}
+  },
+
+  async batchDeleteNodes(group){
+    const ids=this.getSelectedIds(group);
+    if(!ids.length){this.notify('请先选择节点','error');return}
+    const ok=await this.showConfirm('批量删除','确定删除选中的 '+ids.length+' 个节点？此操作不可撤销！','danger','删除');
+    if(!ok)return;
+    try{await API.batchDelete(ids);await this.loadNodes();ids.forEach(id=>{this.selectedNodes[id]=false});this.batchMode=false;this.notify('已删除 '+ids.length+' 个节点','success')}catch(e){this.notify('删除失败: '+e.message,'error')}
+  },
+
+  init(){
+    if(this.token){this.validateToken()}
+    try{this.collapsedGroups=JSON.parse(localStorage.getItem('vkomari_collapsed')||'{}')}catch(e){this.collapsedGroups={}}
+  },
+
+  async validateToken(){
+    try{await API.me();this.sessionExpired=false;this.loadNodes();this.loadTemplates();setInterval(()=>{this.loadNodes();this.loadTemplates()},30000)}catch(e){API.clearToken();this.token='';this.nodes=[];this.sessionExpired=true}
+  },
+
+  async login(){
+    try{const r=await API.login(this.loginForm.username,this.loginForm.password);API.setToken(r.token);this.token=r.token;if(r.isDefault) this.isDefaultPwd=true;this.loginError='';this.sessionExpired=false;this.loadNodes();this.loadTemplates()}catch(e){this.loginError=e.message||'登录失败'}
+  },
+
+  logout(){API.clearToken();this.token='';this.nodes=[];location.reload()},
+
+  async loadNodes(){try{this.nodes=await API.getNodes();this.initDragDrop()}catch(e){}},
+  async loadTemplates(){try{this.templates=await API.getTemplates()}catch(e){}},
+
+  async toggleNode(id,enabled){try{await API.toggleNode(id,enabled);await this.loadNodes()}catch(e){this.notify('操作失败: '+e.message,'error')}},
+  async batchAction(a){try{await API.batchNodes(a);await this.loadNodes();this.notify(a==='start'?'已全部启动':'已全部停止','success')}catch(e){this.notify('操作失败: '+e.message,'error')}},
+  async deleteNode(id){const ok=await this.showConfirm('删除节点','确定删除此节点？','danger','删除');if(!ok)return;try{await API.deleteNode(id);await this.loadNodes();this.notify('节点已删除','success')}catch(e){this.notify('删除失败: '+e.message,'error')}},
+
+  openModal(){this.editingTemplateId=null;this.editingTemplateName='';this.form={os:'Debian GNU/Linux 12 (bookworm)',arch:'amd64',virtualization:'kvm',region:'CN',cpu_model:'Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz',cpu_cores:2,ram_total:2,ram_unit:'GB',swap_total:512,swap_unit:'MB',disk_total:20,disk_unit:'GB',net_unit:'Bytes',load_profile:'mid',cpu_min:0,cpu_max:0,mem_min:0,mem_max:0,swap_min:0,swap_max:0,disk_min:0,disk_max:0,net_min:0,net_max:0,conn_min:0,conn_max:0,proc_min:0,proc_max:0,fake_ip:'',group_name:'',komari_server:'',komari_token:'',cfmonitor_server:'',cfmonitor_token:'',report_enabled:true,enabled:true,name:'',report_interval:3,traffic_reset_day:1,boot_time:0,uptime_base:86400,boot_date:'',kernel_version:this.getKernels('Debian GNU/Linux 12 (bookworm)')[0]};this.refreshLoad(false);this.generateIpForRegion('CN');this.parseResult='';this.installScript='';this.showModal=true},
+
+  editNode(n){this.editingTemplateId=null;this.editingTemplateName='';this.form={...n,report_enabled:!!n.report_enabled,enabled:!!n.enabled};this.parseResult='';this.installScript='';this.form.kernel_version=n.kernel_version||this.getKernels(n.os)[0]||'';this.form.boot_date=n.boot_time?new Date(n.boot_time*1000).toISOString().slice(0,10):'';this.initUnits();this.showModal=true},
+
+  refreshLoad(showToast=true){
+    this.applyPreset();
+    if(showToast)this.notify('负载区间已刷新','success')
+  },
+
+  applyPreset(){
+    const p=this.dd.loadPresets[this.form.load_profile];if(!p)return;
+    const fuzz=(v,r)=>Math.max(0,Math.round((v+(Math.random()*2-1)*r)*10)/10);
+    [['cpu_min','cpu_max'],['mem_min','mem_max'],['swap_min','swap_max'],['disk_min','disk_max']].forEach(([a,b])=>{let lo=fuzz(p[a],5),hi=fuzz(p[b],5);if(lo>hi)[lo,hi]=[hi,lo];this.form[a]=lo;this.form[b]=hi});
+    [['conn_min','conn_max'],['proc_min','proc_max'],['net_min','net_max']].forEach(([a,b])=>{let lo=fuzz(p[a],p[a]*0.2),hi=fuzz(p[b],p[b]*0.2);if(lo>hi)[lo,hi]=[hi,lo];this.form[a]=Math.round(lo);this.form[b]=Math.round(hi)});
+    this.form.net_unit='Bytes';
+  },
+
+  async saveNode(){
+    const f=this.normalizedForm();
+    const bootTime=f.boot_date?Math.floor(new Date(f.boot_date+'T00:00:00').getTime()/1000):(f.boot_time||0);
+    const data={...f,
+      name:f.name||'VPS-'+Math.floor(Math.random()*1000),
+      report_enabled:f.report_enabled?1:0,enabled:f.enabled?1:0,
+      report_interval:Number(f.report_interval)||3,traffic_reset_day:Number(f.traffic_reset_day)||1,
+      boot_time:bootTime,uptime_base:bootTime?Math.max(0,Math.floor(Date.now()/1000)-bootTime):(f.uptime_base||86400),
+      client_uuid:f.client_uuid||crypto.randomUUID(),
+      sort_order:f.sort_order||0,group_name:f.group_name||''
+    };
+    if(!data.name) data.name='VPS-'+Math.floor(Math.random()*1000);
+    try{await API.saveNode(data);this.showModal=false;await this.loadNodes();this.notify('节点已保存','success')}catch(e){this.notify('保存失败: '+e.message,'error')}
+  },
+
+  async changePassword(){
+    if(!this.newPassword||this.newPassword.length<6) return this.notify('密码至少6位','error');
+    try{await API.changePassword(this.newPassword);this.showPwdModal=false;this.isDefaultPwd=false;this.notify('密码已修改','success')}catch(e){this.notify(e.message,'error')}
+  },
+
+  async saveAsTemplate(){
+    const f=this.normalizedForm();const name=this.newTemplateName||prompt('模板名称:');if(!name)return;
+    const cfg={os:f.os,arch:f.arch,virtualization:f.virtualization,region:f.region,cpu_model:f.cpu_model,gpu_name:f.gpu_name,kernel_version:f.kernel_version,cpu_cores:f.cpu_cores,ram_total:f.ram_total,swap_total:f.swap_total,disk_total:f.disk_total,load_profile:f.load_profile,cpu_min:f.cpu_min,cpu_max:f.cpu_max,mem_min:f.mem_min,mem_max:f.mem_max,swap_min:f.swap_min,swap_max:f.swap_max,disk_min:f.disk_min,disk_max:f.disk_max,net_min:f.net_min,net_max:f.net_max,conn_min:f.conn_min,conn_max:f.conn_max,proc_min:f.proc_min,proc_max:f.proc_max,report_interval:f.report_interval,traffic_reset_day:f.traffic_reset_day,report_enabled:f.report_enabled?1:0};
+    try{await API.saveTemplate(name,cfg);this.newTemplateName='';await this.loadTemplates();this.notify('模板已保存','success')}catch(e){this.notify('保存失败: '+e.message,'error')}
+  },
+
+  applyTemplate(t){
+    const keep={id:this.form.id,name:this.form.name,client_uuid:this.form.client_uuid,komari_server:this.form.komari_server,komari_token:this.form.komari_token,cfmonitor_server:this.form.cfmonitor_server,cfmonitor_token:this.form.cfmonitor_token};
+    this.form={...this.form,...t.config,...keep,report_enabled:!!t.config.report_enabled};
+    if(!this.form.kernel_version)this.form.kernel_version=this.getKernels(this.form.os)[0]||'';
+    this.refreshLoad(false);
+    if(this.form.region)this.generateIpForRegion(this.form.region);
+    this.initUnits();
+    this.notify('已应用模板: '+t.name,'success')
+  },
+
+  async deleteTemplate(id){const ok=await this.showConfirm('删除模板','确定删除此模板？','danger','删除');if(!ok)return;try{await API.deleteTemplate(id);await this.loadTemplates()}catch(e){this.notify('删除失败','error')}},
+
+  editTemplate(t){this.openModal();this.editingTemplateId=t.id;this.editingTemplateName=t.name;this.applyTemplate(t);this.notify('已加载模板「'+t.name+'」配置，修改后点击保存模板','info')},
+
+  async saveTemplateCurrent(){
+    if(!this.editingTemplateId){this.openSaveTplModal();return}
+    const f=this.normalizedForm();
+    const cfg={os:f.os,arch:f.arch,virtualization:f.virtualization,region:f.region,cpu_model:f.cpu_model,gpu_name:f.gpu_name,kernel_version:f.kernel_version,cpu_cores:f.cpu_cores,ram_total:f.ram_total,swap_total:f.swap_total,disk_total:f.disk_total,load_profile:f.load_profile,cpu_min:f.cpu_min,cpu_max:f.cpu_max,mem_min:f.mem_min,mem_max:f.mem_max,swap_min:f.swap_min,swap_max:f.swap_max,disk_min:f.disk_min,disk_max:f.disk_max,net_min:f.net_min,net_max:f.net_max,conn_min:f.conn_min,conn_max:f.conn_max,proc_min:f.proc_min,proc_max:f.proc_max,report_interval:f.report_interval,traffic_reset_day:f.traffic_reset_day,report_enabled:f.report_enabled?1:0};
+    try{await API.updateTemplate(this.editingTemplateId,this.editingTemplateName,cfg);await this.loadTemplates();this.notify('模板「'+this.editingTemplateName+'」已更新','success')}catch(e){this.notify('保存失败: '+e.message,'error')}
+  },
+
+  openSaveTplModal(){this.saveTplName=this.editingTemplateName||'';this.showSaveTplModal=true;this.$nextTick(()=>{if(this.$refs.saveTplInput)this.$refs.saveTplInput.focus()})},
+
+  async saveTemplateAs(){
+    if(!this.saveTplName.trim()){this.notify('请输入模板名称','error');return}
+    const f=this.normalizedForm();
+    const cfg={os:f.os,arch:f.arch,virtualization:f.virtualization,region:f.region,cpu_model:f.cpu_model,gpu_name:f.gpu_name,kernel_version:f.kernel_version,cpu_cores:f.cpu_cores,ram_total:f.ram_total,swap_total:f.swap_total,disk_total:f.disk_total,load_profile:f.load_profile,cpu_min:f.cpu_min,cpu_max:f.cpu_max,mem_min:f.mem_min,mem_max:f.mem_max,swap_min:f.swap_min,swap_max:f.swap_max,disk_min:f.disk_min,disk_max:f.disk_max,net_min:f.net_min,net_max:f.net_max,conn_min:f.conn_min,conn_max:f.conn_max,proc_min:f.proc_min,proc_max:f.proc_max,report_interval:f.report_interval,traffic_reset_day:f.traffic_reset_day,report_enabled:f.report_enabled?1:0};
+    try{await API.saveTemplate(this.saveTplName.trim(),cfg);this.showSaveTplModal=false;await this.loadTemplates();this.notify('模板「'+this.saveTplName.trim()+'」已保存','success')}catch(e){this.notify('保存失败: '+e.message,'error')}
+  },
+
+  parseScript(){
+    const s=this.installScript.trim();if(!s){this.parseResult='请粘贴安装脚本';return}
+    const r=window.parseInstallScript?.(s);
+    if(!r){this.parseResult='❌ 无法解析，请检查脚本格式';return}
+    if(r.panel==='komari'){this.form.komari_server=r.server;this.form.komari_token=r.token;this.parseResult='✅ 已填入 Komari 面板'}else{this.form.cfmonitor_server=r.server;this.form.cfmonitor_token=r.token;this.form.client_uuid=r.uuid||this.form.client_uuid;this.parseResult='✅ 已填入 CF-VPS-Monitor 面板'}
+    if(r.name)this.form.name=r.name
+  },
+
+  showRename(g){this.renameForm={oldName:g,newName:g};this.showRenameModal=true},
+  async doRename(){const{oldName,newName}=this.renameForm;if(!newName||oldName===newName){this.showRenameModal=false;return}try{await API.renameGroup(oldName,newName);this.showRenameModal=false;await this.loadNodes();this.notify('分组已重命名','success')}catch(e){this.notify('重命名失败: '+e.message,'error')}},
+
+  exportNodes(){
+    const clean=this.nodes.map(n=>{const{id,online,sendCount,uptime,lastError,created_at,...r}=n;return r});
+    const blob=new Blob([JSON.stringify(clean,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='vkomari-export.json';a.click();
+    this.notify('已导出 '+clean.length+' 个节点','success')
+  },
+
+  async importNodesFromFile(e){
+    const files=Array.from(e.target.files);if(!files.length)return;
+    try{
+      const allNodes=[];
+      for(const file of files){const text=await file.text();const nodes=JSON.parse(text);if(Array.isArray(nodes)){allNodes.push(...nodes)}else if(nodes&&typeof nodes==='object'){allNodes.push(nodes)}else{throw new Error(file.name+': 格式错误')}}
+      if(!allNodes.length)throw new Error('未找到有效节点数据');
+      this.pendingImportNodes=allNodes;
+      this.importGroupForm={mode:'none',groupName:'',newGroup:''};
+      this.showImportGroupModal=true;
+      e.target.value=''}catch(e){this.notify('导入失败: '+e.message,'error');e.target.value=''}
+  },
+
+  cancelImport(){this.showImportGroupModal=false;this.pendingImportNodes=null},
+
+  async showCFDiag(){
+    this.showCFDiagModal=true;this.cfDiagData=null;
+    try{const r=await fetch('/api/cfmonitor/diag',{headers:{'Authorization':'Bearer '+this.token}});if(!r.ok)throw new Error(r.status);this.cfDiagData=await r.json()}catch(e){this.notify('诊断加载失败: '+e.message,'error')}
+  },
+
+  async confirmImport(){
+    if(!this.pendingImportNodes)return;
+    const mode=this.importGroupForm.mode;
+    let groupName='';
+    if(mode==='existing'){groupName=this.importGroupForm.groupName;if(!groupName){this.notify('请选择已有分组','error');return}}
+    else if(mode==='new'){groupName=this.importGroupForm.newGroup.trim();if(!groupName){this.notify('请输入新分组名称','error');return}}
+    const nodes=this.pendingImportNodes.map(n=>({...n,group_name:mode==='none'?(n.group_name||''):groupName}));
+    try{await API.importNodes(nodes);await this.loadNodes();this.notify('成功导入 '+nodes.length+' 个节点','success')}catch(e){this.notify('导入失败: '+e.message,'error')}
+    this.showImportGroupModal=false;this.pendingImportNodes=null
+  },
+
+  generateIpForRegion(code){
+    const cidr=this.dd.ipRanges[code];
+    if(cidr)this.form.fake_ip=this.cidrToIp(cidr);
+  },
+
+  cidrToIp(cidr){
+    if(window.cidrToIp) return window.cidrToIp(cidr);
+    const [range,maskText]=cidr.split('/');
+    const mask=Number(maskText);
+    const parts=range.split('.').map(Number);
+    const ip=(((parts[0]*256+parts[1])*256+parts[2])*256+parts[3])>>>0;
+    const size=2**(32-mask);
+    const network=Math.floor(ip/size)*size;
+    const offset=size<=2?0:1+Math.floor(Math.random()*(size-2));
+    const final=network+offset;
+    return [final>>>24,(final>>>16)&255,(final>>>8)&255,final&255].join('.');
+  },
+
+  formatMB(v){v=Number(v)||0;return v>=1024&&v%1024===0?(v/1024)+'GB':v+'MB'},
+
+  toggleUnit(kind){
+    const unit=kind+'_unit',field=kind+'_total';
+    if(kind==='net'){
+      const scale=(m)=>{this.form.net_min=Math.round((Number(this.form.net_min)||0)*m);this.form.net_max=Math.round((Number(this.form.net_max)||0)*m)};
+      if(this.form.net_unit==='Bytes'){scale(1/1024);this.form.net_unit='KB'}else if(this.form.net_unit==='KB'){scale(1/1024);this.form.net_unit='MB'}else{scale(1048576);this.form.net_unit='Bytes'}
+      return;
+    }
+    if(this.form[unit]==='GB'){this.form[field]=Math.round((Number(this.form[field])||0)*1024);this.form[unit]='MB'}else{this.form[field]=Math.round((Number(this.form[field])||0)/1024*100)/100;this.form[unit]='GB'}
+  },
+
+  initUnits(){
+    ['ram','swap','disk'].forEach(k=>{const f=k+'_total',u=k+'_unit',v=Number(this.form[f])||0;this.form[u]='MB';if(v>=1024&&v%1024===0){this.form[f]=v/1024;this.form[u]='GB'}});
+    this.form.net_unit='Bytes';
+    const min=Number(this.form.net_min)||0,max=Number(this.form.net_max)||0;
+    if(min>=1048576&&min%1048576===0&&max%1048576===0){this.form.net_min=min/1048576;this.form.net_max=max/1048576;this.form.net_unit='MB'}
+    else if(min>=1024&&min%1024===0&&max%1024===0){this.form.net_min=min/1024;this.form.net_max=max/1024;this.form.net_unit='KB'}
+  },
+
+  normalizedForm(){
+    const p={...this.form};
+    if(p.ram_unit==='GB')p.ram_total=Math.round((Number(p.ram_total)||0)*1024);
+    if(p.swap_unit==='GB')p.swap_total=Math.round((Number(p.swap_total)||0)*1024);
+    if(p.disk_unit==='GB')p.disk_total=Math.round((Number(p.disk_total)||0)*1024);
+    if(p.net_unit==='KB'){p.net_min=Math.round((Number(p.net_min)||0)*1024);p.net_max=Math.round((Number(p.net_max)||0)*1024)}
+    else if(p.net_unit==='MB'){p.net_min=Math.round((Number(p.net_min)||0)*1048576);p.net_max=Math.round((Number(p.net_max)||0)*1048576)}
+    delete p.ram_unit;delete p.swap_unit;delete p.disk_unit;delete p.net_unit;
+    return p;
+  },
+
+  initDragDrop(){
+    this.$nextTick(()=>{
+      document.querySelectorAll('.grid[data-group]').forEach(grid=>{
+        new Sortable(grid,{group:'nodes',animation:200,ghostClass:'opacity-30',onEnd:async(evt)=>{
+          const cards=[...grid.querySelectorAll('[data-id]')];
+          const updates=cards.map((c,i)=>({id:parseInt(c.dataset.id),sort_order:i,group_name:grid.dataset.group}));
+          try{await API.reorderNodes(updates);await this.loadNodes()}catch(e){this.notify('排序失败','error')}
+        }})
+      })
+    })
+  }
+}}
+</script>
+
+</body>
+</html>
