@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   ipv6 TEXT,
   fake_ip TEXT,
   load_profile TEXT DEFAULT 'mid',
-  cpu_min REAL DEFAULT 5.0,
+  cpu_min REAL DEFAULT 0.0,
   cpu_max REAL DEFAULT 85.0,
   mem_min REAL DEFAULT 15.0,
   mem_max REAL DEFAULT 85.0,

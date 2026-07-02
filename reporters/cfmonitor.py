@@ -139,7 +139,7 @@ class CFMonitorReporter:
             "disk":int(self.agent.usable["disk"]*stats["disk"]/100),
             "disk_total":self.agent.usable["disk"],
             "net_in":stats["up"],"net_out":stats["down"],
-            "net_total_in":stats["totalUp"],"net_total_out":stats["totalDown"],
+            "net_total_up":stats["totalUp"],"net_total_down":stats["totalDown"],
             "process_count":stats["proc"],"connections":stats["conn"],
             "connections_udp":stats["connUdp"],"uptime":stats["uptime"],
             "timestamp":int(now*1000),"version":"1.0.0",

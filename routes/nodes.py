@@ -11,6 +11,9 @@ router = APIRouter()
 
 
 # These are plain functions (not route handlers 鈥?those are in main.py)
+def _random_uptime_base():
+    return random.randint(1, 30) * 86400
+
 
 def _list_nodes(request: Request):
     return get_nodes()
@@ -25,7 +28,7 @@ async def _create_node(request: Request):
     if not d.get("report_interval"):
         d["report_interval"] = 3
     if not d.get("uptime_base"):
-        d["uptime_base"] = random.randint(1, 7) * 86400
+        d["uptime_base"] = _random_uptime_base()
     return save_node(d)
 
 
@@ -127,7 +130,7 @@ async def _import_nodes(request: Request):
             if not n.get("report_interval"):
                 n["report_interval"] = 3
             if not n.get("uptime_base"):
-                n["uptime_base"] = random.randint(1, 7) * 86400
+                n["uptime_base"] = _random_uptime_base()
             values = [n.get(k) for k in fields]
             placeholders = ", ".join("?" for _ in fields)
             db.execute(f"INSERT INTO nodes ({', '.join(fields)}) VALUES ({placeholders})", values)
