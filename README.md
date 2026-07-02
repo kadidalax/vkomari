@@ -1,90 +1,109 @@
 # vKomari
 
-vKomari is a lightweight virtual VPS/node panel. It creates virtual nodes and reports simulated metrics to Komari and CF-VPS-Monitor panels.
+vKomari 是一个轻量级虚拟 VPS 节点面板，可以创建虚拟节点，并把模拟的状态数据上报到 Komari 和 CF-VPS-Monitor 探针面板。
 
-## Features
+## 功能
 
-- Manage many virtual nodes from one web UI.
-- Report to Komari and CF-VPS-Monitor.
-- CF-VPS-Monitor Agent WebSocket policy support: active viewers use realtime reporting, idle panels use background reporting.
-- Simulated CPU, memory, swap, disk, network, process, connection, OS, kernel, region, IP, and GPU metadata.
-- Import/export nodes and reusable templates.
-- Docker Compose deployment.
+- Web 面板管理多个虚拟节点。
+- 支持 Komari 上报。
+- 支持 CF-VPS-Monitor 上报。
+- 支持 CF-VPS-Monitor Agent WebSocket 策略：前台有人查看时实时上报，无人查看时后台间隔上报。
+- 可模拟 CPU、内存、交换分区、磁盘、流量、进程、连接数、系统、内核、地区、IP、GPU 等信息。
+- 支持节点导入、导出和模板。
+- 支持 Docker Compose 一键部署。
 
-## Docker Compose
+## Docker Compose 一键部署
+
+下载 `docker-compose.yml`：
 
 ```bash
-git clone https://github.com/kadidalax/vkomari.git
-cd vkomari
-docker compose up -d --build
+wget -O docker-compose.yml https://raw.githubusercontent.com/kadidalax/vkomari/main/docker-compose.yml
 ```
 
-Open:
+启动：
+
+```bash
+docker compose up -d
+```
+
+访问：
 
 ```text
-http://your-server-ip:25770
+http://你的服务器IP:25770
 ```
 
-Default login:
+默认账号：
 
 ```text
-username: admin
-password: vkomari
+用户名：admin
+密码：vkomari
 ```
 
-Change the password after first login.
+首次登录后请及时修改密码。
 
-## Configuration
+## 可选配置
 
-Optional `.env` file:
+如需自定义端口、JWT 密钥或出站代理，在 `docker-compose.yml` 同目录创建 `.env`：
 
 ```env
 PORT=25770
-JWT_SECRET=change-this-to-a-long-random-string
+JWT_SECRET=请改成一段足够长的随机字符串
 
-# Optional outbound proxy for panels that need it.
+# 可选：连接 Komari / CF-VPS-Monitor 外网面板需要代理时填写
 # HTTP_PROXY=http://host.docker.internal:10808
 # HTTPS_PROXY=http://host.docker.internal:10808
 ```
 
-Then restart:
+重新启动：
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-Data is stored in the Docker volume `vkomari_data`.
+数据保存在 Docker volume：`vkomari_data`。
 
-## Update
+## 更新
 
 ```bash
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-## Useful Commands
+## 常用命令
+
+查看日志：
 
 ```bash
 docker compose logs -f
+```
+
+重启：
+
+```bash
 docker compose restart
+```
+
+停止：
+
+```bash
 docker compose down
 ```
 
-To remove the app and its stored data:
+删除应用和数据：
 
 ```bash
 docker compose down -v
 ```
 
-## Local Development
+## 本地开发
 
 ```bash
 python -m venv .venv
-. .venv/Scripts/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## License
+## 许可证
 
 MIT

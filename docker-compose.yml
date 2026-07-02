@@ -1,6 +1,6 @@
 services:
   vkomari:
-    build: .
+    image: ghcr.io/kadidalax/vkomari:latest
     container_name: vkomari
     ports:
       - "${PORT:-25770}:8000"
