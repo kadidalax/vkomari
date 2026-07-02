@@ -576,7 +576,7 @@ const DROPDOWN_DATA = {
 
     // 3. 默认规格
     defaults: {
-        cpu_cores: 2,
+        cpu_cores: 1,
         ram_total: 1024,
         swap_total: 0,
         disk_total: 10,
@@ -584,8 +584,8 @@ const DROPDOWN_DATA = {
         arch: "amd64",
         virtualization: "kvm",
         region: "CN",
-        report_interval: 3,
-        load_profile: "low",
+        report_interval: 1,
+        load_profile: "mid",
         fake_ip: "Hidden"
     }
     ,
