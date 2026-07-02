@@ -5,7 +5,7 @@ vKomari 是一个轻量级虚拟 VPS 节点面板，可以创建虚拟节点，�
 ## 功能
 
 - Web 面板管理多个虚拟节点。
-- 支持 Komari 上报。
+- 支持 Komari 上报和 Komari Agent 自动发现导入。
 - 支持 CF-VPS-Monitor 上报。
 - 支持 CF-VPS-Monitor Agent WebSocket 策略：前台有人查看时实时上报，无人查看时后台间隔上报。
 - 可模拟 CPU、内存、交换分区、磁盘、流量、进程、连接数、系统、内核、地区、IP、GPU 等信息。

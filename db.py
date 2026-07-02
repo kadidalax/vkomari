@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   sort_order INTEGER DEFAULT 0,
   komari_server TEXT,
   komari_token TEXT,
+  komari_auto_discovery TEXT,
   cfmonitor_server TEXT,
   cfmonitor_token TEXT,
   report_enabled INTEGER DEFAULT 0,
@@ -98,9 +99,13 @@ NODE_FIELDS = [
     'swap_min', 'swap_max', 'disk_min', 'disk_max', 'net_min', 'net_max',
     'conn_min', 'conn_max', 'proc_min', 'proc_max', 'report_interval', 'enabled',
     'boot_time', 'fake_ip', 'group_name', 'gpu_name', 'ipv6', 'traffic_reset_day',
-    'uptime_base', 'sort_order', 'komari_server', 'komari_token',
+    'uptime_base', 'sort_order', 'komari_server', 'komari_token', 'komari_auto_discovery',
     'cfmonitor_server', 'cfmonitor_token', 'report_enabled'
 ]
+
+NODE_MIGRATIONS = {
+    "komari_auto_discovery": "komari_auto_discovery TEXT",
+}
 
 
 def get_db():
@@ -114,6 +119,10 @@ def ensure_schema():
     db = get_db()
     try:
         db.executescript(SCHEMA_SQL)
+        existing = {row["name"] for row in db.execute("PRAGMA table_info(nodes)").fetchall()}
+        for name, ddl in NODE_MIGRATIONS.items():
+            if name not in existing:
+                db.execute(f"ALTER TABLE nodes ADD COLUMN {ddl}")
         db.commit()
     finally:
         db.close()

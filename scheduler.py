@@ -12,6 +12,7 @@ scheduler = BackgroundScheduler()
 
 # Persisted reporters across ticks -- keyed by a stable node identity.
 _komari_reporters = {}   # node_id -> KomariReporter
+_komari_configs = {}     # node_id -> config fingerprint
 _cfmonitor_reporters = {} # node_id -> CFMonitorReporter
 _cfmonitor_configs = {}   # node_id -> config fingerprint
 
@@ -41,22 +42,35 @@ def _cfmonitor_fingerprint(node):
     return json.dumps({k: node.get(k) for k in keys}, sort_keys=True, ensure_ascii=False)
 
 
+def _komari_fingerprint(node):
+    keys = [
+        "komari_server", "komari_token", "komari_auto_discovery", "name", "client_uuid",
+        "fake_ip", "ipv6", "region", "cpu_model", "cpu_cores", "ram_total", "ram_unit",
+        "swap_total", "swap_unit", "disk_total", "disk_unit", "load_profile", "report_interval",
+    ]
+    return json.dumps({k: node.get(k) for k in keys}, sort_keys=True, ensure_ascii=False)
+
+
 async def _async_tick():
     _ensure_schema_safe()
     nodes = get_enabled_nodes()
 
     # Build set of current node ids
-    current_ids = set()
+    current_komari_ids = set()
     current_cf_ids = set()
     reporters = []
 
     for node in nodes:
         nid = str(node["id"])
-        current_ids.add(nid)
 
-        if node.get("komari_server") and node.get("komari_token"):
+        if node.get("komari_server") and (node.get("komari_token") or node.get("komari_auto_discovery")):
+            current_komari_ids.add(nid)
+            fingerprint = _komari_fingerprint(node)
+            if nid in _komari_reporters and _komari_configs.get(nid) != fingerprint:
+                del _komari_reporters[nid]
             if nid not in _komari_reporters:
                 _komari_reporters[nid] = KomariReporter(dict(node))
+                _komari_configs[nid] = fingerprint
             reporters.append(_komari_reporters[nid])
 
         if node.get("cfmonitor_server") and node.get("cfmonitor_token"):
@@ -72,8 +86,9 @@ async def _async_tick():
 
     # Clean up stale reporters
     for nid in list(_komari_reporters.keys()):
-        if nid not in current_ids:
+        if nid not in current_komari_ids:
             del _komari_reporters[nid]
+            _komari_configs.pop(nid, None)
     for nid in list(_cfmonitor_reporters.keys()):
         if nid not in current_cf_ids:
             _cfmonitor_reporters[nid].close()

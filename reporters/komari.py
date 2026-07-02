@@ -4,6 +4,7 @@ import time
 import httpx
 from urllib.parse import quote
 from agent import VirtualAgent
+from db import get_db
 
 
 def country_flag(region: str) -> str:
@@ -40,6 +41,61 @@ class KomariReporter:
     def report_url(self) -> str:
         token = quote(str(self.config.get("komari_token", "")), safe="")
         return "{}/api/clients/report?token={}".format(self.http_base, token)
+
+    async def ensure_token(self) -> bool:
+        if self.config.get("komari_token"):
+            return True
+        key = str(self.config.get("komari_auto_discovery") or "").strip()
+        if not key:
+            return False
+        name = quote(str(self.config.get("name") or self.config.get("client_uuid") or "vkomari"), safe="")
+        url = "{}/api/clients/register?name={}".format(self.http_base, name)
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+                resp = await client.post(
+                    url,
+                    json={"key": key},
+                    headers={"Authorization": "Bearer {}".format(key), "Content-Type": "application/json"},
+                )
+            if resp.status_code >= 400:
+                raise RuntimeError("register returned {}: {}".format(resp.status_code, resp.text[:200]))
+            payload = resp.json()
+            if payload.get("status") != "success":
+                raise RuntimeError(payload.get("message") or "auto-discovery register failed")
+            data = payload.get("data") or {}
+            token = str(data.get("token") or "")
+            uuid = str(data.get("uuid") or "")
+            if not token:
+                raise RuntimeError("auto-discovery response missing token")
+            self.config["komari_token"] = token
+            if uuid:
+                self.config["client_uuid"] = uuid
+            self._persist_auto_discovery_result(token, uuid)
+            self.fail_count = 0
+            print("[vKomari] {} auto-discovery registered".format(self.log_name()))
+            return True
+        except Exception as e:
+            self.fail_count += 1
+            if self.fail_count <= 3:
+                print("[vKomari] {} auto-discovery failed: {}".format(self.log_name(), e))
+            return False
+
+    def _persist_auto_discovery_result(self, token: str, uuid: str):
+        node_id = self.config.get("id")
+        if not node_id:
+            return
+        db = get_db()
+        try:
+            if uuid:
+                db.execute(
+                    "UPDATE nodes SET komari_token = ?, client_uuid = ? WHERE id = ?",
+                    (token, uuid, node_id),
+                )
+            else:
+                db.execute("UPDATE nodes SET komari_token = ? WHERE id = ?", (token, node_id))
+            db.commit()
+        finally:
+            db.close()
 
     async def upload_basic_info(self):
         c = self.config
@@ -121,6 +177,8 @@ class KomariReporter:
         print("[vKomari] {} report http".format(self.log_name()))
 
     async def send(self):
+        if not await self.ensure_token():
+            return
         if not self.info_sent:
             await self.upload_basic_info()
         try:

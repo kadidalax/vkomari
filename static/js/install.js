@@ -7,13 +7,15 @@ export function parseInstallScript(input) {
     return '';
   };
   const isUrl = (value) => /^https?:\/\//i.test(value);
-  const komariServer = flag('-e', isUrl);
+  const komariServer = flag('-e', isUrl) || flag('--endpoint', isUrl);
   const cfServer = flag('-s', isUrl);
   const server = komariServer || cfServer;
   const token = flag('-t');
-  if (!server || !token) return null;
+  const autoDiscovery = flag('--auto-discovery');
+  if (!server || (!token && !autoDiscovery)) return null;
   const panel = cfServer ? 'cfmonitor' : 'komari';
   const result = { panel, server, token };
+  if (autoDiscovery) result.autoDiscovery = autoDiscovery;
   const name = flag('-n');
   const uuid = flag('-i');
   if (name) result.name = name;
