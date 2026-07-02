@@ -75,6 +75,7 @@ def test_komari_reporter_registers_auto_discovery_before_reporting():
             "name": "AutoNode",
             "komari_server": "https://komari.example.com",
             "komari_auto_discovery": "ad-secret",
+            "sort_order": 12,
             "ram_total": 512,
             "disk_total": 1024,
         })
@@ -87,6 +88,7 @@ def test_komari_reporter_registers_auto_discovery_before_reporting():
     assert reporter.config["komari_token"] == "registered-token"
     assert reporter.config["client_uuid"] == "komari-uuid"
     assert any("uploadBasicInfo?token=registered-token" in call[0] for call in calls)
+    assert next(call[1] for call in calls if "uploadBasicInfo" in call[0])["weight"] == 12
     assert any("report?token=registered-token" in call[0] for call in calls)
 
 
@@ -159,6 +161,7 @@ def test_auto_discovery_import_is_idempotent():
             "komari_server": "https://komari.example.com/",
             "komari_auto_discovery": "auto-discovery-key",
             "komari_token": "",
+            "sort_order": 1,
             "report_enabled": True,
             "enabled": True,
         }
@@ -174,6 +177,7 @@ def test_auto_discovery_import_is_idempotent():
         finally:
             conn.close()
 
+        node["sort_order"] = 42
         result = asyncio.run(nodes_module._import_nodes(FakeRequest({"nodes": [node]})))
         rows = db_module.get_nodes()
 
@@ -182,6 +186,7 @@ def test_auto_discovery_import_is_idempotent():
     assert len(rows) == 1
     assert rows[0]["komari_token"] == "registered-token"
     assert rows[0]["client_uuid"] == "registered-uuid"
+    assert rows[0]["sort_order"] == 42
 
 
 def test_import_nodes_are_inserted_by_name_descending():

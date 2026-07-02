@@ -666,7 +666,8 @@ function app(){return{
     const files=Array.from(e.target.files);if(!files.length)return;
     try{
       const allNodes=[];
-      for(const file of files){const text=await file.text();const nodes=JSON.parse(text);if(Array.isArray(nodes)){allNodes.push(...nodes)}else if(nodes&&typeof nodes==='object'){allNodes.push(nodes)}else{throw new Error(file.name+': 格式错误')}}
+      const weightFromName=name=>{const m=name.match(/^(\d+)/);return m?parseInt(m[1],10):0};
+      for(const file of files){const text=await file.text();const weight=weightFromName(file.name);const nodes=JSON.parse(text);if(Array.isArray(nodes)){allNodes.push(...nodes.map(n=>({...n,sort_order:weight})))}else if(nodes&&typeof nodes==='object'){allNodes.push({...nodes,sort_order:weight})}else{throw new Error(file.name+': 格式错误')}}
       if(!allNodes.length)throw new Error('未找到有效节点数据');
       this.pendingImportNodes=allNodes;
       this.importGroupForm={mode:'none',groupName:'',newGroup:''};

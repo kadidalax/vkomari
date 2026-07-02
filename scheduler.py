@@ -47,6 +47,7 @@ def _komari_fingerprint(node):
         "komari_server", "komari_token", "komari_auto_discovery", "name", "client_uuid",
         "fake_ip", "ipv6", "region", "cpu_model", "cpu_cores", "ram_total", "ram_unit",
         "swap_total", "swap_unit", "disk_total", "disk_unit", "load_profile", "report_interval",
+        "sort_order",
     ]
     return json.dumps({k: node.get(k) for k in keys}, sort_keys=True, ensure_ascii=False)
 

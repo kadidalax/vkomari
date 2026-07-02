@@ -126,6 +126,7 @@ class KomariReporter:
             "disk_total": self.agent.usable["disk"],
             "gpu_name": c.get("gpu_name", ""),
             "virtualization": c.get("virtualization", "kvm"),
+            "weight": int(c.get("sort_order") or 0),
             "version": "1.0.0"
         }
         if region:
