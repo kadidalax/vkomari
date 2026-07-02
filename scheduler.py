@@ -13,6 +13,7 @@ scheduler = BackgroundScheduler()
 # Persisted reporters across ticks -- keyed by a stable node identity.
 _komari_reporters = {}   # node_id -> KomariReporter
 _cfmonitor_reporters = {} # node_id -> CFMonitorReporter
+_cfmonitor_configs = {}   # node_id -> config fingerprint
 
 
 def _ensure_schema_safe():
@@ -30,12 +31,23 @@ def _sync_tick():
         print("[vKomari] Scheduler tick error: {}".format(e))
 
 
+def _cfmonitor_fingerprint(node):
+    keys = [
+        "cfmonitor_server", "cfmonitor_token", "name", "client_uuid", "fake_ip",
+        "ipv6", "region", "cpu_model", "cpu_cores", "ram_total", "ram_unit",
+        "swap_total", "swap_unit", "disk_total", "disk_unit", "load_profile",
+        "report_interval",
+    ]
+    return json.dumps({k: node.get(k) for k in keys}, sort_keys=True, ensure_ascii=False)
+
+
 async def _async_tick():
     _ensure_schema_safe()
     nodes = get_enabled_nodes()
 
     # Build set of current node ids
     current_ids = set()
+    current_cf_ids = set()
     reporters = []
 
     for node in nodes:
@@ -48,8 +60,14 @@ async def _async_tick():
             reporters.append(_komari_reporters[nid])
 
         if node.get("cfmonitor_server") and node.get("cfmonitor_token"):
+            current_cf_ids.add(nid)
+            fingerprint = _cfmonitor_fingerprint(node)
+            if nid in _cfmonitor_reporters and _cfmonitor_configs.get(nid) != fingerprint:
+                _cfmonitor_reporters[nid].close()
+                del _cfmonitor_reporters[nid]
             if nid not in _cfmonitor_reporters:
                 _cfmonitor_reporters[nid] = CFMonitorReporter(dict(node))
+                _cfmonitor_configs[nid] = fingerprint
             reporters.append(_cfmonitor_reporters[nid])
 
     # Clean up stale reporters
@@ -57,9 +75,10 @@ async def _async_tick():
         if nid not in current_ids:
             del _komari_reporters[nid]
     for nid in list(_cfmonitor_reporters.keys()):
-        if nid not in current_ids:
+        if nid not in current_cf_ids:
             _cfmonitor_reporters[nid].close()
             del _cfmonitor_reporters[nid]
+            _cfmonitor_configs.pop(nid, None)
 
     # Run all reporters concurrently, never let one crash stop others
     if reporters:

@@ -27,10 +27,12 @@ class CFMonitorReporter:
         self.last_send_log_at = 0
         self.fail_count = 0
         self.force_next_send = True
-        self.policy = {"mode":"idle","sample_interval_sec":120,"report_interval_sec":120,"viewer_count":0,"report_now":False}
+        self.force_timer_reset = False
+        initial_interval = max(1, min(int(config.get("report_interval") or 3), 3600))
+        self.policy = {"mode":"initial","sample_interval_sec":initial_interval,"report_interval_sec":initial_interval,"viewer_count":0,"report_now":False}
         self._stop = threading.Event()
         self._thread = None
-        self.diag = {"sendCount":0,"lastSendTs":0,"wsState":"closed"}
+        self.diag = {"sendCount":0,"lastSendTs":0,"wsState":"closed","policy":self.policy.copy(),"lastPolicyTs":0}
 
     @property
     def http_base(self) -> str:
@@ -46,7 +48,7 @@ class CFMonitorReporter:
             base = "wss://" + base[8:]
         elif base.startswith("http://"):
             base = "ws://" + base[7:]
-        return "{}/api/clients/report?token={}".format(base, quote(self.token, safe=""))
+        return "{}/api/clients/report".format(base)
 
     def basic_info_url(self) -> str:
         return "{}/api/clients/uploadBasicInfo?token={}".format(self.http_base, quote(self.token, safe=""))
@@ -55,10 +57,16 @@ class CFMonitorReporter:
         return {"Authorization":"Bearer "+self.token,"Content-Type":"application/json"}
 
     def report_interval_sec(self) -> int:
+        return self.sample_interval_sec()
+
+    def sample_interval_sec(self) -> int:
         return max(1, min(int(self.policy.get("sample_interval_sec",120)), 3600))
 
+    def upload_interval_sec(self) -> int:
+        return max(1, min(int(self.policy.get("report_interval_sec",self.sample_interval_sec())), 3600))
+
     def _apply_policy(self, data: dict):
-        old_mode = self.policy.get("mode")
+        old_policy = dict(self.policy)
         self.policy.update({
             "mode": data.get("mode", "idle"),
             "sample_interval_sec": data.get("sample_interval_sec", data.get("report_interval_sec", 120)),
@@ -66,10 +74,13 @@ class CFMonitorReporter:
             "viewer_count": data.get("viewer_count", 0),
             "report_now": bool(data.get("report_now")),
         })
-        if self.policy.get("mode") != old_mode:
+        self.force_timer_reset = True
+        self.diag["policy"] = self.policy.copy()
+        self.diag["lastPolicyTs"] = int(time.time() * 1000)
+        if self.policy != old_policy:
             print("[vKomari] {} policy: mode={} interval={}s viewers={}".format(
                 self.log_name(), self.policy.get("mode"),
-                self.report_interval_sec(), self.policy.get("viewer_count")))
+                self.sample_interval_sec(), self.policy.get("viewer_count")))
 
     def region_label(self) -> str:
         region = (self.config.get("region") or "").strip()
@@ -148,13 +159,16 @@ class CFMonitorReporter:
         print("[vKomari] {} report ws mode={}".format(self.log_name(), self.policy.get("mode","idle")))
 
     async def _send_ws_report(self, ws):
+        await self._send_ws_reports(ws, [self.build_report(time.time())])
+
+    async def _send_ws_reports(self, ws, reports):
         now = time.time()
         if not self.info_sent:
             await self.upload_basic_info()
-        await ws.send(json.dumps({"type":"reports","reports":[self.build_report(now)]}))
+        await ws.send(json.dumps({"type":"reports","reports":reports}))
         now_ms = int(now * 1000)
         self.last_send_at = now_ms
-        self.diag["sendCount"] += 1
+        self.diag["sendCount"] += len(reports)
         self.diag["lastSendTs"] = now_ms
         self.log_send(now)
         self.fail_count = 0
@@ -171,20 +185,43 @@ class CFMonitorReporter:
                 ping_timeout=20,
             ) as ws:
                 self.diag["wsState"] = "open"
-                next_send = 0.0
+                pending = []
+                next_sample = 0.0
+                next_upload = 0.0
                 while not self._stop.is_set():
                     now = time.time()
-                    if self.force_next_send or now >= next_send:
+                    sample_interval = self.sample_interval_sec()
+                    upload_interval = self.upload_interval_sec()
+                    if self.force_next_send:
                         self.force_next_send = False
-                        await self._send_ws_report(ws)
-                        next_send = time.time() + self.report_interval_sec()
+                        pending.append(self.build_report(now))
+                        await self._send_ws_reports(ws, pending)
+                        pending = []
+                        next_sample = time.time() + sample_interval
+                        next_upload = time.time() + upload_interval
+                    elif now >= next_sample:
+                        pending.append(self.build_report(now))
+                        next_sample = now + sample_interval
+                        if upload_interval <= sample_interval:
+                            await self._send_ws_reports(ws, pending)
+                            pending = []
+                            next_upload = time.time() + upload_interval
+                    elif pending and now >= next_upload:
+                        await self._send_ws_reports(ws, pending)
+                        pending = []
+                        next_upload = time.time() + upload_interval
+                    next_event = min(next_sample, next_upload if pending else next_sample)
                     try:
-                        msg = await asyncio.wait_for(ws.recv(), timeout=max(0.2, min(1.0, next_send - time.time())))
+                        msg = await asyncio.wait_for(ws.recv(), timeout=max(0.2, min(1.0, next_event - time.time())))
                     except asyncio.TimeoutError:
                         continue
                     data = json.loads(msg)
                     if isinstance(data, dict) and data.get("type") == "policy":
                         self._apply_policy(data)
+                        if self.force_timer_reset:
+                            self.force_timer_reset = False
+                            next_sample = time.time() + self.sample_interval_sec()
+                            next_upload = time.time() + self.upload_interval_sec()
                         if data.get("report_now"):
                             self.force_next_send = True
         except Exception as e:
