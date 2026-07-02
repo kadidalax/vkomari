@@ -3,12 +3,10 @@
 import asyncio
 import time
 import json
-import os
-import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
 from db import ensure_schema, get_enabled_nodes, set_setting, get_setting
 from reporters.komari import KomariReporter
-from reporters.cfmonitor import CFMonitorReporter, cf_diag
+from reporters.cfmonitor import CFMonitorReporter
 
 scheduler = BackgroundScheduler()
 

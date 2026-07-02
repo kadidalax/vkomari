@@ -7,21 +7,6 @@ import websockets
 
 from agent import VirtualAgent
 
-COUNTRY_REGIONS = {
-    "CN":"Shanghai, China, CN","US":"Los Angeles, United States, US",
-    "JP":"Tokyo, Japan, JP","DE":"Frankfurt, Germany, DE",
-    "GB":"London, United Kingdom, GB","HK":"Hong Kong, Hong Kong, HK",
-    "SG":"Singapore, Singapore, SG","KR":"Seoul, South Korea, KR",
-    "NL":"Amsterdam, Netherlands, NL","FR":"Paris, France, FR",
-    "CA":"Toronto, Canada, CA","AU":"Sydney, Australia, AU",
-    "IN":"Mumbai, India, IN","BR":"Sao Paulo, Brazil, BR",
-    "RU":"Moscow, Russia, RU","TW":"Taipei, Taiwan, TW",
-    "AE":"Dubai, United Arab Emirates, AE",
-    "CLOUDFLARE":"Cloudflare Edge Network, Cloudflare, CLOUDFLARE",
-    "UNKNOWN":"Unknown, Unknown, UNKNOWN",
-}
-
-cf_diag = {"reporters":[],"lastUpdate":0}
 _http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
 _https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
 
