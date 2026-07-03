@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 from auth import auth_required, hash_password
 from db import ensure_schema, get_setting, get_db, get_user, update_password, get_templates
-from scheduler import start_scheduler
+from scheduler import start_scheduler, stop_scheduler
 
 # Import route functions
 from routes.auth import router as auth_router_module
@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):
     print("[vKomari] Ready")
     yield
     print("[vKomari] Shutting down...")
+    stop_scheduler()
 
 
 app = FastAPI(

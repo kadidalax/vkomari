@@ -31,6 +31,7 @@ class KomariReporter:
         self.agent = VirtualAgent(config)
         self.tick_count = 0
         self.info_sent = False
+        self.last_attempt_at = 0
         self.last_send_log_at = 0
         self.fail_count = 0
         self._register_lock = threading.Lock()
@@ -45,7 +46,22 @@ class KomariReporter:
         token = quote(str(self.config.get("komari_token", "")), safe="")
         return "{}/api/clients/report?token={}".format(self.http_base, token)
 
-    async def ensure_token(self) -> bool:
+    async def _post(self, client, url: str, **kwargs):
+        if client is not None:
+            return await client.post(url, **kwargs)
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as c:
+            return await c.post(url, **kwargs)
+
+    def retry_interval_sec(self) -> int:
+        try:
+            base = max(1, min(int(self.config.get("report_interval") or 1), 3600))
+        except (ValueError, TypeError):
+            base = 1
+        if self.fail_count:
+            return min(60, max(base, 2 ** min(self.fail_count, 5)))
+        return base
+
+    async def ensure_token(self, client=None) -> bool:
         if self.config.get("komari_token"):
             return True
         key = str(self.config.get("komari_auto_discovery") or "").strip()
@@ -60,12 +76,12 @@ class KomariReporter:
         name = quote(str(self.config.get("name") or self.config.get("client_uuid") or "vkomari"), safe="")
         url = "{}/api/clients/register?name={}".format(self.http_base, name)
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
-                resp = await client.post(
-                    url,
-                    json={"key": key},
-                    headers={"Authorization": "Bearer {}".format(key), "Content-Type": "application/json"},
-                )
+            resp = await self._post(
+                client,
+                url,
+                json={"key": key},
+                headers={"Authorization": "Bearer {}".format(key), "Content-Type": "application/json"},
+            )
             if resp.status_code >= 400:
                 raise RuntimeError("register returned {}: {}".format(resp.status_code, resp.text[:200]))
             payload = resp.json()
@@ -109,7 +125,7 @@ class KomariReporter:
         finally:
             db.close()
 
-    async def upload_basic_info(self):
+    async def upload_basic_info(self, client=None):
         c = self.config
         region = country_flag(str(c.get("region", "")))
         info = {
@@ -134,11 +150,11 @@ class KomariReporter:
             info["region"] = region
         token_enc = quote(str(c.get("komari_token", "")), safe="")
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
-                await client.post(
-                    "{}/api/clients/uploadBasicInfo?token={}".format(self.http_base, token_enc),
-                    json=info
-                )
+            await self._post(
+                client,
+                "{}/api/clients/uploadBasicInfo?token={}".format(self.http_base, token_enc),
+                json=info,
+            )
             self.info_sent = True
             self.fail_count = 0
         except Exception as e:
@@ -190,14 +206,17 @@ class KomariReporter:
         self.last_send_log_at = now
         print("[vKomari] {} report http".format(self.log_name()))
 
-    async def send(self):
-        if not await self.ensure_token():
+    async def send(self, client=None):
+        now = time.time()
+        if self.last_attempt_at and now - self.last_attempt_at < self.retry_interval_sec():
+            return
+        self.last_attempt_at = now
+        if not await self.ensure_token(client):
             return
         if not self.info_sent:
-            await self.upload_basic_info()
+            await self.upload_basic_info(client)
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
-                await client.post(self.report_url, json=self.build_report())
+            await self._post(client, self.report_url, json=self.build_report())
             self.log_send()
             self.fail_count = 0
         except Exception as e:

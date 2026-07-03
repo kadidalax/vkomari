@@ -3,12 +3,15 @@
 import asyncio
 import time
 import json
-from apscheduler.schedulers.background import BackgroundScheduler
+import threading
+import httpx
 from db import ensure_schema, get_enabled_nodes, set_setting, get_setting
 from reporters.komari import KomariReporter
 from reporters.cfmonitor import CFMonitorReporter
 
-scheduler = BackgroundScheduler()
+TICK_SECONDS = 1
+_scheduler_stop = threading.Event()
+_scheduler_thread = None
 
 # Persisted reporters across ticks -- keyed by a stable node identity.
 _komari_reporters = {}   # node_id -> KomariReporter
@@ -22,14 +25,6 @@ def _ensure_schema_safe():
         ensure_schema()
     except Exception:
         pass
-
-
-def _sync_tick():
-    """Sync wrapper that schedules the async tick."""
-    try:
-        asyncio.run(_async_tick())
-    except Exception as e:
-        print("[vKomari] Scheduler tick error: {}".format(e))
 
 
 def _cfmonitor_fingerprint(node):
@@ -52,14 +47,14 @@ def _komari_fingerprint(node):
     return json.dumps({k: node.get(k) for k in keys}, sort_keys=True, ensure_ascii=False)
 
 
-async def _async_tick():
-    _ensure_schema_safe()
+async def _async_tick(komari_client=None):
     nodes = get_enabled_nodes()
 
     # Build set of current node ids
     current_komari_ids = set()
     current_cf_ids = set()
-    reporters = []
+    komari_reporters = []
+    cf_reporters = []
 
     for node in nodes:
         nid = str(node["id"])
@@ -72,7 +67,7 @@ async def _async_tick():
             if nid not in _komari_reporters:
                 _komari_reporters[nid] = KomariReporter(dict(node))
                 _komari_configs[nid] = fingerprint
-            reporters.append(_komari_reporters[nid])
+            komari_reporters.append(_komari_reporters[nid])
 
         if node.get("cfmonitor_server") and node.get("cfmonitor_token"):
             current_cf_ids.add(nid)
@@ -83,7 +78,7 @@ async def _async_tick():
             if nid not in _cfmonitor_reporters:
                 _cfmonitor_reporters[nid] = CFMonitorReporter(dict(node))
                 _cfmonitor_configs[nid] = fingerprint
-            reporters.append(_cfmonitor_reporters[nid])
+            cf_reporters.append(_cfmonitor_reporters[nid])
 
     # Clean up stale reporters
     for nid in list(_komari_reporters.keys()):
@@ -96,10 +91,12 @@ async def _async_tick():
             del _cfmonitor_reporters[nid]
             _cfmonitor_configs.pop(nid, None)
 
-    # Run all reporters concurrently, never let one crash stop others
-    if reporters:
+    # Run all reporters concurrently, never let one crash stop others.
+    # Komari reporters share one long-lived AsyncClient from the scheduler loop.
+    tasks = [r.send(komari_client) for r in komari_reporters] + [r.send() for r in cf_reporters]
+    if tasks:
         await asyncio.gather(
-            *[r.send() for r in reporters],
+            *tasks,
             return_exceptions=True
         )
 
@@ -121,11 +118,29 @@ async def _async_tick():
                 pass
 
 
+async def _scheduler_loop():
+    limits = httpx.Limits(max_connections=32, max_keepalive_connections=16, keepalive_expiry=120)
+    timeout = httpx.Timeout(15.0, connect=5.0)
+    async with httpx.AsyncClient(timeout=timeout, limits=limits) as komari_client:
+        while not _scheduler_stop.is_set():
+            started = time.monotonic()
+            try:
+                await _async_tick(komari_client)
+            except Exception as e:
+                print("[vKomari] Scheduler tick error: {}".format(e))
+            await asyncio.sleep(max(0.1, TICK_SECONDS - (time.monotonic() - started)))
+
+
+def stop_scheduler():
+    _scheduler_stop.set()
+
+
 def start_scheduler():
+    global _scheduler_thread
     _ensure_schema_safe()
-    scheduler.add_job(
-        _sync_tick, "interval", seconds=1, id="vkomari_tick",
-        max_instances=1, misfire_grace_time=30
-    )
-    scheduler.start()
+    if _scheduler_thread and _scheduler_thread.is_alive():
+        return
+    _scheduler_stop.clear()
+    _scheduler_thread = threading.Thread(target=lambda: asyncio.run(_scheduler_loop()), daemon=True)
+    _scheduler_thread.start()
     print("[vKomari] Scheduler started (1s tick)")

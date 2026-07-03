@@ -34,7 +34,7 @@ def test_default_intervals_are_komari_one_cfmonitor_three():
     assert "this.form.report_interval=3" in text
     with open(os.path.join(ROOT, "scheduler.py"), encoding="utf-8") as f:
         scheduler = f.read()
-    assert 'seconds=1' in scheduler
+    assert 'TICK_SECONDS = 1' in scheduler
 
 
 if __name__ == "__main__":

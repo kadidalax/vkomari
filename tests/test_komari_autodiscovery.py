@@ -31,7 +31,6 @@ console.log(JSON.stringify(result));
 
 
 def test_komari_reporter_registers_auto_discovery_before_reporting():
-    from reporters import komari as komari_module
     from reporters.komari import KomariReporter
 
     calls = []
@@ -68,20 +67,15 @@ def test_komari_reporter_registers_auto_discovery_before_reporting():
                 })
             return FakeResponse()
 
-    original_client = komari_module.httpx.AsyncClient
-    komari_module.httpx.AsyncClient = FakeClient
-    try:
-        reporter = KomariReporter({
-            "name": "AutoNode",
-            "komari_server": "https://komari.example.com",
-            "komari_auto_discovery": "ad-secret",
-            "sort_order": 12,
-            "ram_total": 512,
-            "disk_total": 1024,
-        })
-        asyncio.run(reporter.send())
-    finally:
-        komari_module.httpx.AsyncClient = original_client
+    reporter = KomariReporter({
+        "name": "AutoNode",
+        "komari_server": "https://komari.example.com",
+        "komari_auto_discovery": "ad-secret",
+        "sort_order": 12,
+        "ram_total": 512,
+        "disk_total": 1024,
+    })
+    asyncio.run(reporter.send(FakeClient()))
 
     assert calls[0][0] == "https://komari.example.com/api/clients/register?name=AutoNode"
     assert calls[0][2]["Authorization"] == "Bearer ad-secret"
