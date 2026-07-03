@@ -88,7 +88,9 @@ def test_komari_reporter_registers_auto_discovery_before_reporting():
     assert reporter.config["komari_token"] == "registered-token"
     assert reporter.config["client_uuid"] == "komari-uuid"
     assert any("uploadBasicInfo?token=registered-token" in call[0] for call in calls)
-    assert next(call[1] for call in calls if "uploadBasicInfo" in call[0])["weight"] == 12
+    basic_info = next(call[1] for call in calls if "uploadBasicInfo" in call[0])
+    assert basic_info["name"] == "AutoNode"
+    assert basic_info["weight"] == 12
     assert any("report?token=registered-token" in call[0] for call in calls)
 
 

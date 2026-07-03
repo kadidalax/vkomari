@@ -113,6 +113,7 @@ class KomariReporter:
         c = self.config
         region = country_flag(str(c.get("region", "")))
         info = {
+            "name": c.get("name", ""),
             "cpu_name": c.get("cpu_model", "Virtual CPU"),
             "cpu_cores": int(c.get("cpu_cores", 1)),
             "cpu_physical_cores": int(c.get("cpu_cores", 1)),
