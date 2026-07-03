@@ -12,7 +12,7 @@ services:
       - HTTPS_PROXY=${HTTPS_PROXY:-}
       - http_proxy=${http_proxy:-}
       - https_proxy=${https_proxy:-}
-      - VKOMARI_KOMARI_MAX_RPS=${VKOMARI_KOMARI_MAX_RPS:-50}
+      - VKOMARI_KOMARI_MAX_RPS=${VKOMARI_KOMARI_MAX_RPS:-25}
     restart: unless-stopped
 
 volumes:

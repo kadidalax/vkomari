@@ -20,7 +20,7 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-KOMARI_MAX_REPORTS_PER_TICK = _env_int("VKOMARI_KOMARI_MAX_RPS", 50)
+KOMARI_MAX_REPORTS_PER_TICK = _env_int("VKOMARI_KOMARI_MAX_RPS", 25)
 _scheduler_stop = threading.Event()
 _scheduler_thread = None
 _komari_cursor = 0
