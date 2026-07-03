@@ -215,9 +215,27 @@ def test_import_nodes_are_inserted_by_name_descending():
     assert names == ["CC_节点", "BB_节点", "AA_节点"]
 
 
+def test_komari_reporters_are_rate_limited_by_rotation():
+    import scheduler
+
+    old_limit = scheduler.KOMARI_MAX_REPORTS_PER_TICK
+    old_cursor = scheduler._komari_cursor
+    try:
+        scheduler.KOMARI_MAX_REPORTS_PER_TICK = 2
+        scheduler._komari_cursor = 0
+        reporters = ["a", "b", "c", "d", "e"]
+        assert scheduler._next_komari_batch(reporters) == ["a", "b"]
+        assert scheduler._next_komari_batch(reporters) == ["c", "d"]
+        assert scheduler._next_komari_batch(reporters) == ["e", "a"]
+    finally:
+        scheduler.KOMARI_MAX_REPORTS_PER_TICK = old_limit
+        scheduler._komari_cursor = old_cursor
+
+
 if __name__ == "__main__":
     test_install_script_parses_komari_auto_discovery()
     test_komari_reporter_registers_auto_discovery_before_reporting()
     test_komari_auto_discovery_registration_is_singleflight()
     test_auto_discovery_import_is_idempotent()
     test_import_nodes_are_inserted_by_name_descending()
+    test_komari_reporters_are_rate_limited_by_rotation()

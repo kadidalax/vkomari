@@ -1,6 +1,7 @@
 ﻿# Background scheduler: runs the dual-panel simulation loop.
 # ponytail: persisted reporter dict keyed by node id, recreated on config changes.
 import asyncio
+import os
 import time
 import json
 import threading
@@ -10,8 +11,19 @@ from reporters.komari import KomariReporter
 from reporters.cfmonitor import CFMonitorReporter
 
 TICK_SECONDS = 1
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+KOMARI_MAX_REPORTS_PER_TICK = _env_int("VKOMARI_KOMARI_MAX_RPS", 50)
 _scheduler_stop = threading.Event()
 _scheduler_thread = None
+_komari_cursor = 0
 
 # Persisted reporters across ticks -- keyed by a stable node identity.
 _komari_reporters = {}   # node_id -> KomariReporter
@@ -45,6 +57,16 @@ def _komari_fingerprint(node):
         "sort_order",
     ]
     return json.dumps({k: node.get(k) for k in keys}, sort_keys=True, ensure_ascii=False)
+
+
+def _next_komari_batch(reporters):
+    global _komari_cursor
+    if len(reporters) <= KOMARI_MAX_REPORTS_PER_TICK:
+        return reporters
+    start = _komari_cursor % len(reporters)
+    end = start + KOMARI_MAX_REPORTS_PER_TICK
+    _komari_cursor = end % len(reporters)
+    return (reporters + reporters)[start:end]
 
 
 async def _async_tick(komari_client=None):
@@ -93,7 +115,7 @@ async def _async_tick(komari_client=None):
 
     # Run all reporters concurrently, never let one crash stop others.
     # Komari reporters share one long-lived AsyncClient from the scheduler loop.
-    tasks = [r.send(komari_client) for r in komari_reporters] + [r.send() for r in cf_reporters]
+    tasks = [r.send(komari_client) for r in _next_komari_batch(komari_reporters)] + [r.send() for r in cf_reporters]
     if tasks:
         await asyncio.gather(
             *tasks,
