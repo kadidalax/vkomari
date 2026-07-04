@@ -19,8 +19,6 @@
   "komari_auto_discovery": "",
   "report_enabled": true,
   "enabled": true,
-  "cpu_min": 0,
-  "cpu_max": 48.8,
   "mem_min": 39.9,
   "mem_max": 48.1,
   "swap_min": 2,

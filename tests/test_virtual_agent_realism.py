@@ -1,6 +1,8 @@
-﻿import os
+import json
+import os
 import re
 import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -11,6 +13,7 @@ from routes.nodes import _random_uptime_base
 from scheduler import _cfmonitor_fingerprint, _komari_fingerprint
 
 DAY = 86400
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def with_fixed_time(fn):
@@ -108,6 +111,13 @@ def test_cpu_presets_overlap_and_increase_by_profile():
     assert "cpu_max" not in presets
 
 
+def test_import_presets_do_not_carry_legacy_cpu_ranges():
+    for path in (ROOT / "imports").glob("*.json"):
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        assert "cpu_min" not in data
+        assert "cpu_max" not in data
+
+
 def test_cpu_changes_are_profile_specific_and_visible():
     low, mid, high = sample("low"), sample("mid"), sample("high")
     avg = lambda xs: sum(xs) / len(xs)
@@ -201,6 +211,7 @@ if __name__ == "__main__":
     test_total_traffic_tracks_uptime_and_speed()
     test_new_nodes_randomize_uptime_between_1_and_30_days()
     test_cpu_presets_overlap_and_increase_by_profile()
+    test_import_presets_do_not_carry_legacy_cpu_ranges()
     test_cpu_changes_are_profile_specific_and_visible()
     test_cpu_ignores_legacy_min_max_limits()
     test_scheduler_fingerprint_tracks_load_ranges()
