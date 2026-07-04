@@ -51,6 +51,23 @@ def test_cfmonitor_uses_official_total_traffic_fields():
     assert "net_total_out" not in report
 
 
+def test_cfmonitor_maps_network_direction_fields():
+    reporter = CFMonitorReporter({
+        "name": "direction",
+        "cfmonitor_server": "https://example.com",
+        "cfmonitor_token": "token",
+        "ram_total": 1024,
+        "disk_total": 10240,
+        "uptime_base": 3 * DAY,
+    })
+    stats = reporter.agent.generate_stats(0)
+    report = reporter.build_report(1700000000)
+    assert report["net_in"] == stats["down"]
+    assert report["net_out"] == stats["up"]
+    assert report["net_total_up"] == stats["totalUp"]
+    assert report["net_total_down"] == stats["totalDown"]
+
+
 def test_total_traffic_tracks_uptime_and_speed():
     def totals(uptime_days, net_min, net_max):
         return VirtualAgent({
@@ -148,6 +165,7 @@ def test_memory_and_disk_percentages_stay_inside_configured_ranges():
 
 if __name__ == "__main__":
     test_cfmonitor_uses_official_total_traffic_fields()
+    test_cfmonitor_maps_network_direction_fields()
     test_total_traffic_tracks_uptime_and_speed()
     test_new_nodes_randomize_uptime_between_1_and_30_days()
     test_cpu_presets_overlap_and_increase_by_profile()
