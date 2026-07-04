@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -65,7 +66,30 @@ def test_cfmonitor_reports_detailed_region_in_report_and_basic_info():
     assert report["basic_info"]["region"] == "China, CN"
 
 
+def test_cfmonitor_has_readable_labels_for_all_import_regions():
+    expected = {
+        "KP": "North Korea, KP",
+        "IR": "Iran, IR",
+        "SY": "Syria, SY",
+        "AQ": "Antarctica, AQ",
+    }
+    for code, label in expected.items():
+        reporter = CFMonitorReporter({"region": code})
+        assert reporter.region_label() == label
+
+    imports_dir = Path(__file__).resolve().parents[1] / "imports"
+    codes = {
+        part
+        for path in imports_dir.glob("*.json")
+        for part in path.stem.split("_")
+        if len(part) == 2 and part.isalpha()
+    }
+    missing = [code for code in sorted(codes) if CFMonitorReporter({"region": code}).region_label() == f"{code}, {code}"]
+    assert missing == []
+
+
 if __name__ == "__main__":
     test_policy_intervals()
     test_cfmonitor_fingerprint_changes_on_token_edit()
     test_cfmonitor_reports_detailed_region_in_report_and_basic_info()
+    test_cfmonitor_has_readable_labels_for_all_import_regions()
