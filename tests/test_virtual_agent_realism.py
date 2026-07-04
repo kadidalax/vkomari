@@ -184,6 +184,33 @@ def test_memory_swap_disk_keep_base_usage_and_move_slowly():
     assert max(s["disk"] for s in stats) - min(s["disk"] for s in stats) < 2
 
 
+def test_low_profile_memory_and_disk_respect_base_usage():
+    def collect():
+        a = VirtualAgent({
+            "name": "low-base-resources",
+            "load_profile": "low",
+            "ram_total": 1024,
+            "swap_total": 512,
+            "disk_total": 10240,
+            "uptime_base": 7 * DAY,
+        })
+        return a, [a.generate_stats(i) for i in range(180)]
+
+    agent, stats = with_fixed_time(collect)
+    mem_used = [1024 * s["mem"] / 100 for s in stats]
+    disk_used = [10240 * s["disk"] / 100 for s in stats]
+    assert min(mem_used) >= agent.usable["ramBaseMB"]
+    assert min(disk_used) >= agent.usable["diskBaseMB"]
+
+
+def test_load_presets_do_not_generate_tiny_resource_usage():
+    text = open("static/js/data.js", encoding="utf-8").read()
+    presets = re.search(r"loadPresets: \{(.*?)\n    \}", text, re.S).group(1)
+    assert "low: { mem_min: 24" in presets
+    assert "disk_min: 24" in presets
+    assert '"mem_min": 24, "mem_max": 44' in open("agent.py", encoding="utf-8").read()
+
+
 def test_memory_and_disk_percentages_stay_inside_configured_ranges():
     def collect():
         a = VirtualAgent({
@@ -216,4 +243,6 @@ if __name__ == "__main__":
     test_cpu_ignores_legacy_min_max_limits()
     test_scheduler_fingerprint_tracks_load_ranges()
     test_memory_swap_disk_keep_base_usage_and_move_slowly()
+    test_low_profile_memory_and_disk_respect_base_usage()
+    test_load_presets_do_not_generate_tiny_resource_usage()
     test_memory_and_disk_percentages_stay_inside_configured_ranges()

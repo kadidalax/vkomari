@@ -28,8 +28,8 @@ PROFILE_DEFAULTS = {
         "cpu_min": 0, "cpu_max": 35, "cpu_rest": 0.0,
         "cpu_burst_period1": 22, "cpu_burst_period2": 55, "cpu_burst_period3": 9,
         "cpu_burst_amp": 0.85,
-        "mem_min": 8, "mem_max": 18, "swap_min": 0, "swap_max": 2,
-        "disk_min": 8, "disk_max": 28,
+        "mem_min": 24, "mem_max": 44, "swap_min": 0, "swap_max": 4,
+        "disk_min": 24, "disk_max": 44,
         "net_min": 10000, "net_max": 200000,
         "conn_min": 2, "conn_max": 25,
         "proc_min": 35, "proc_max": 70
@@ -38,8 +38,8 @@ PROFILE_DEFAULTS = {
         "cpu_min": 0, "cpu_max": 65, "cpu_rest": 0.01,
         "cpu_burst_period1": 11, "cpu_burst_period2": 31, "cpu_burst_period3": 6,
         "cpu_burst_amp": 0.75,
-        "mem_min": 35, "mem_max": 55, "swap_min": 0, "swap_max": 8,
-        "disk_min": 30, "disk_max": 58,
+        "mem_min": 35, "mem_max": 65, "swap_min": 0, "swap_max": 18,
+        "disk_min": 30, "disk_max": 65,
         "net_min": 102400, "net_max": 1024000,
         "conn_min": 30, "conn_max": 120,
         "proc_min": 70, "proc_max": 140
@@ -48,8 +48,8 @@ PROFILE_DEFAULTS = {
         "cpu_min": 0, "cpu_max": 95, "cpu_rest": 0.03,
         "cpu_burst_period1": 5, "cpu_burst_period2": 15, "cpu_burst_period3": 3.5,
         "cpu_burst_amp": 1.0,
-        "mem_min": 72, "mem_max": 92, "swap_min": 8, "swap_max": 40,
-        "disk_min": 68, "disk_max": 86,
+        "mem_min": 62, "mem_max": 95, "swap_min": 10, "swap_max": 55,
+        "disk_min": 55, "disk_max": 90,
         "net_min": 1048576, "net_max": 5242880,
         "conn_min": 220, "conn_max": 850,
         "proc_min": 120, "proc_max": 260
