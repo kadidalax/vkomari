@@ -172,17 +172,15 @@ class VirtualAgent:
 
         # Memory
         mem_min, mem_max = self._range("mem_min", "mem_max", 100)
-        mem_var_span = max(1, mem_max - mem_min)
-        mem_var_pct = self._clamp(
-            mem_min + mem_var_span * (
+        mem_span = max(0, mem_max - mem_min)
+        mem = self._clamp(
+            mem_min + mem_span * (
                 0.18 + self.node_seed * 0.14 + self._wave(t, 1800, 2.2) * 0.34
                 + self._wave(t, 5400, 3.5) * 0.14 + slow_active * 0.10
             ), 0, 100
         )
         ram_total_mb = self._mb("ram_total", 1024)
-        mem_used_mb = (self.usable["ramBaseMB"]
-                       + (ram_total_mb - self.usable["ramBaseMB"]) * mem_var_pct / 100)
-        mem = self._clamp(mem_used_mb / max(ram_total_mb, 1) * 100, 0, 100)
+        mem_used_mb = ram_total_mb * mem / 100
 
         # Swap
         swap_total_mb = self._mb("swap_total", 0, True)
@@ -203,20 +201,15 @@ class VirtualAgent:
 
         # Disk
         disk_min, disk_max = self._range("disk_min", "disk_max", 100)
-        disk_var_span = max(1, disk_max - disk_min)
+        disk_span = max(0, disk_max - disk_min)
         disk_growth = ((int(t / 3600) + int(self.node_seed * 100)) % 720) / 720
-        disk_var_pct = self._clamp(
-            disk_min + disk_var_span * (
+        disk = self._clamp(
+            disk_min + disk_span * (
                 0.12 + self.node_seed * 0.58 + disk_growth * 0.22
                 + self._wave(t, 7200, 0.7) * 0.06
             ), 0, 100
         )
         disk_total_mb = self._mb("disk_total", 10240)
-        swap_used_mb = swap_total_mb * swap / 100 if swap_total_mb > 0 else 0
-        disk_used_mb = (self.usable["diskBaseMB"]
-                        + (disk_total_mb - self.usable["diskBaseMB"]) * disk_var_pct / 100
-                        + swap_used_mb)
-        disk = self._clamp(disk_used_mb / max(disk_total_mb, 1) * 100, 0, 100)
 
         # Network
         net_min, net_max = self._range("net_min", "net_max")

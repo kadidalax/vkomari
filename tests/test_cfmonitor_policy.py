@@ -50,6 +50,22 @@ def test_cfmonitor_fingerprint_changes_on_token_edit():
     assert _cfmonitor_fingerprint(node) != _cfmonitor_fingerprint(changed)
 
 
+def test_cfmonitor_reports_detailed_region_in_report_and_basic_info():
+    reporter = CFMonitorReporter({
+        "name": "geo",
+        "cfmonitor_server": "https://example.com",
+        "cfmonitor_token": "token",
+        "fake_ip": "1.3.29.85",
+        "region": "CN",
+    })
+    report = reporter.build_report(1700000000)
+    assert report["ipv4"] == "1.3.29.85"
+    assert report["region"] == "China, CN"
+    assert report["basic_info"]["ipv4"] == "1.3.29.85"
+    assert report["basic_info"]["region"] == "China, CN"
+
+
 if __name__ == "__main__":
     test_policy_intervals()
     test_cfmonitor_fingerprint_changes_on_token_edit()
+    test_cfmonitor_reports_detailed_region_in_report_and_basic_info()

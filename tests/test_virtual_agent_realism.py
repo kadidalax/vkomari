@@ -125,6 +125,27 @@ def test_memory_swap_disk_keep_base_usage_and_move_slowly():
     assert max(s["disk"] for s in stats) - min(s["disk"] for s in stats) < 2
 
 
+def test_memory_and_disk_percentages_stay_inside_configured_ranges():
+    def collect():
+        a = VirtualAgent({
+            "name": "bounded-resources",
+            "load_profile": "mid",
+            "ram_total": 1024,
+            "swap_total": 512,
+            "disk_total": 10240,
+            "mem_min": 36.8,
+            "mem_max": 39.8,
+            "disk_min": 35.1,
+            "disk_max": 35.3,
+            "uptime_base": 7 * DAY,
+        })
+        return [a.generate_stats(i) for i in range(180)]
+
+    stats = with_fixed_time(collect)
+    assert all(36.8 <= s["mem"] <= 39.8 for s in stats)
+    assert all(35.1 <= s["disk"] <= 35.3 for s in stats)
+
+
 if __name__ == "__main__":
     test_cfmonitor_uses_official_total_traffic_fields()
     test_total_traffic_tracks_uptime_and_speed()
@@ -132,3 +153,4 @@ if __name__ == "__main__":
     test_cpu_presets_overlap_and_increase_by_profile()
     test_cpu_changes_are_profile_specific_and_visible()
     test_memory_swap_disk_keep_base_usage_and_move_slowly()
+    test_memory_and_disk_percentages_stay_inside_configured_ranges()

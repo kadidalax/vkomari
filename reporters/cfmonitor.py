@@ -7,6 +7,19 @@ import websockets
 
 from agent import VirtualAgent
 
+REGION_LABELS = {
+    "CN": "China, CN",
+    "HK": "Hong Kong, HK",
+    "US": "United States, US",
+    "JP": "Japan, JP",
+    "SG": "Singapore, SG",
+    "GB": "United Kingdom, GB",
+    "DE": "Germany, DE",
+    "FR": "France, FR",
+    "KR": "South Korea, KR",
+    "TW": "Taiwan, TW",
+}
+
 _http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
 _https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
 
@@ -84,7 +97,11 @@ class CFMonitorReporter:
 
     def region_label(self) -> str:
         region = (self.config.get("region") or "").strip()
-        if region: return region
+        if region:
+            code = region.upper()
+            if len(code) == 2 and code.isalpha():
+                return REGION_LABELS.get(code, "{}, {}".format(code, code))
+            return region
         fake_ip = str(self.config.get("fake_ip") or "").strip()
         if fake_ip:
             first = fake_ip.split(".")[0] if "." in fake_ip else fake_ip
@@ -108,6 +125,7 @@ class CFMonitorReporter:
             "kernel_version":c.get("kernel_version",""),
             "ipv4":c.get("fake_ip") or c.get("ipv4",""),
             "ipv6":c.get("ipv6",""),
+            "region":self.region_label(),
             "mem_total":self.agent.usable["ram"],
             "swap_total":self.agent.usable["swap"],
             "disk_total":self.agent.usable["disk"],
