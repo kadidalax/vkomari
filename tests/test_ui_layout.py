@@ -58,6 +58,19 @@ def test_load_presets_have_stable_seeded_spread():
     assert 'src="js/api.js?v=' in text
 
 
+def test_refresh_load_changes_seed_and_templates_keep_ranges():
+    text = html()
+    assert "loadSeed:''" in text
+    assert "if(showToast)this.loadSeed=crypto.randomUUID()" in text
+    assert "+this.loadSeed" in text
+    assert "band=(a,b,k,minWidth=0,round=r1)" in text
+    assert "['mem_min','mem_max','mem',8]" in text
+    assert "['disk_min','disk_max','disk',8]" in text
+    assert "band(a,b,k,0,Math.round)" in text
+    apply_template = text[text.index("applyTemplate(t){"):text.index("async deleteTemplate", text.index("applyTemplate(t){"))]
+    assert "refreshLoad" not in apply_template
+
+
 def test_spa_entry_disables_stale_html_cache():
     with open(os.path.join(ROOT, "main.py"), encoding="utf-8") as f:
         main = f.read()
@@ -69,4 +82,5 @@ if __name__ == "__main__":
     test_cards_use_saved_order_and_group_name_sort_buttons()
     test_default_intervals_are_komari_one_cfmonitor_three()
     test_load_presets_have_stable_seeded_spread()
+    test_refresh_load_changes_seed_and_templates_keep_ranges()
     test_spa_entry_disables_stale_html_cache()

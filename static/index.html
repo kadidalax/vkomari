@@ -479,7 +479,7 @@ function app(){return{
   nodes:[],showModal:false,showPwdModal:false,isDefaultPwd:false,newPassword:'',
   form:{},countrySearch:'',installScript:'',parseResult:'',
   toasts:[],searchQuery:'',searchOpen:false,activeGroup:'',newTemplateName:'',
-  collapsedGroups:{},templates:[],
+  collapsedGroups:{},templates:[],loadSeed:'',
   selectedNodes:{},batchMode:false,batchTargetGroup:'',
   confirmDialog:{show:false,title:'',message:'',type:'info',isConfirm:false,confirmText:'确定',onConfirm:()=>{},onCancel:()=>{}},
   showRenameModal:false,renameForm:{oldName:'',newName:''},
@@ -568,23 +568,24 @@ function app(){return{
   async batchAction(a){try{await API.batchNodes(a);await this.loadNodes();this.notify(a==='start'?'已全部启动':'已全部停止','success')}catch(e){this.notify('操作失败: '+e.message,'error')}},
   async deleteNode(id){const ok=await this.showConfirm('删除节点','确定删除此节点？','danger','删除');if(!ok)return;try{await API.deleteNode(id);await this.loadNodes();this.notify('节点已删除','success')}catch(e){this.notify('删除失败: '+e.message,'error')}},
 
-  openModal(){this.editingTemplateId=null;this.editingTemplateName='';this.form={os:'Debian GNU/Linux 12 (bookworm)',arch:'amd64',virtualization:'kvm',region:'CN',cpu_model:'Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz',cpu_cores:1,ram_total:1,ram_unit:'GB',swap_total:512,swap_unit:'MB',disk_total:10,disk_unit:'GB',net_unit:'Bytes',load_profile:'mid',mem_min:0,mem_max:0,swap_min:0,swap_max:0,disk_min:0,disk_max:0,net_min:0,net_max:0,conn_min:0,conn_max:0,proc_min:0,proc_max:0,fake_ip:'',group_name:'',komari_server:'',komari_token:'',komari_auto_discovery:'',cfmonitor_server:'',cfmonitor_token:'',report_enabled:true,enabled:true,name:'',client_uuid:crypto.randomUUID(),report_interval:1,traffic_reset_day:1,boot_time:0,uptime_base:0,boot_date:'',kernel_version:this.getKernels('Debian GNU/Linux 12 (bookworm)')[0]};this.refreshLoad(false);this.generateIpForRegion('CN');this.parseResult='';this.installScript='';this.showModal=true},
+  openModal(){this.editingTemplateId=null;this.editingTemplateName='';this.loadSeed='';this.form={os:'Debian GNU/Linux 12 (bookworm)',arch:'amd64',virtualization:'kvm',region:'CN',cpu_model:'Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz',cpu_cores:1,ram_total:1,ram_unit:'GB',swap_total:512,swap_unit:'MB',disk_total:10,disk_unit:'GB',net_unit:'Bytes',load_profile:'mid',mem_min:0,mem_max:0,swap_min:0,swap_max:0,disk_min:0,disk_max:0,net_min:0,net_max:0,conn_min:0,conn_max:0,proc_min:0,proc_max:0,fake_ip:'',group_name:'',komari_server:'',komari_token:'',komari_auto_discovery:'',cfmonitor_server:'',cfmonitor_token:'',report_enabled:true,enabled:true,name:'',client_uuid:crypto.randomUUID(),report_interval:1,traffic_reset_day:1,boot_time:0,uptime_base:0,boot_date:'',kernel_version:this.getKernels('Debian GNU/Linux 12 (bookworm)')[0]};this.refreshLoad(false);this.generateIpForRegion('CN');this.parseResult='';this.installScript='';this.showModal=true},
 
-  editNode(n){this.editingTemplateId=null;this.editingTemplateName='';this.form={...n,report_enabled:!!n.report_enabled,enabled:!!n.enabled};this.parseResult='';this.installScript='';this.form.kernel_version=n.kernel_version||this.getKernels(n.os)[0]||'';this.form.boot_date=n.boot_time?new Date(n.boot_time*1000).toISOString().slice(0,10):'';this.initUnits();this.showModal=true},
+  editNode(n){this.editingTemplateId=null;this.editingTemplateName='';this.loadSeed='';this.form={...n,report_enabled:!!n.report_enabled,enabled:!!n.enabled};this.parseResult='';this.installScript='';this.form.kernel_version=n.kernel_version||this.getKernels(n.os)[0]||'';this.form.boot_date=n.boot_time?new Date(n.boot_time*1000).toISOString().slice(0,10):'';this.initUnits();this.showModal=true},
 
   refreshLoad(showToast=true){
+    if(showToast)this.loadSeed=crypto.randomUUID();
     this.applyPreset();
     if(showToast)this.notify('负载区间已刷新','success')
   },
 
   applyPreset(){
     const p=this.dd.loadPresets[this.form.load_profile];if(!p)return;
-    const seed=(this.form.client_uuid||this.form.name||'')+this.form.load_profile;
+    const seed=(this.form.client_uuid||this.form.name||'')+this.form.load_profile+this.loadSeed;
     const r1=v=>Math.round(v*10)/10,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
     const pick=(a,b,k,round=r1)=>round(p[a]+(p[b]-p[a])*this.profileSeed(seed+k));
-    const band=(a,b,k,round=r1)=>{const lo=Number(p[a])||0,hi=Number(p[b])||0,span=Math.max(1,hi-lo),mid=lo+span*this.profileSeed(seed+k),w=span*(.18+.22*this.profileSeed(seed+k+'w'));return [round(clamp(mid-w/2,lo,hi)),round(clamp(mid+w/2,lo,hi))]};
-    [['mem_min','mem_max','mem'],['swap_min','swap_max','swap'],['disk_min','disk_max','disk']].forEach(([a,b,k])=>{const [lo,hi]=band(a,b,k);this.form[a]=lo;this.form[b]=hi});
-    [['conn_min','conn_max','conn'],['proc_min','proc_max','proc'],['net_min','net_max','net']].forEach(([a,b,k])=>{const [lo,hi]=band(a,b,k,Math.round);this.form[a]=lo;this.form[b]=hi});
+    const band=(a,b,k,minWidth=0,round=r1)=>{const lo=Number(p[a])||0,hi=Number(p[b])||0,span=Math.max(1,hi-lo),mid=lo+span*this.profileSeed(seed+k),w=Math.min(span,Math.max(minWidth,span*(.18+.22*this.profileSeed(seed+k+'w'))));return [round(clamp(mid-w/2,lo,hi)),round(clamp(mid+w/2,lo,hi))]};
+    [['mem_min','mem_max','mem',8],['swap_min','swap_max','swap',2],['disk_min','disk_max','disk',8]].forEach(([a,b,k,w])=>{const [lo,hi]=band(a,b,k,w);this.form[a]=lo;this.form[b]=hi});
+    [['conn_min','conn_max','conn'],['proc_min','proc_max','proc'],['net_min','net_max','net']].forEach(([a,b,k])=>{const [lo,hi]=band(a,b,k,0,Math.round);this.form[a]=lo;this.form[b]=hi});
     this.form.net_unit='Bytes';
   },
 
@@ -621,7 +622,6 @@ function app(){return{
     const keep={id:this.form.id,name:this.form.name,client_uuid:this.form.client_uuid,komari_server:this.form.komari_server,komari_token:this.form.komari_token,komari_auto_discovery:this.form.komari_auto_discovery,cfmonitor_server:this.form.cfmonitor_server,cfmonitor_token:this.form.cfmonitor_token};
     this.form={...this.form,...t.config,...keep,report_enabled:!!t.config.report_enabled};
     if(!this.form.kernel_version)this.form.kernel_version=this.getKernels(this.form.os)[0]||'';
-    this.refreshLoad(false);
     if(this.form.region)this.generateIpForRegion(this.form.region);
     this.initUnits();
     this.notify('已应用模板: '+t.name,'success')
