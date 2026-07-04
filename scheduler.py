@@ -33,6 +33,15 @@ _cfmonitor_reporters = {} # node_id -> CFMonitorReporter
 _cfmonitor_configs = {}   # node_id -> config fingerprint
 _report_now_ids = set()
 _report_now_lock = threading.Lock()
+REPORT_CONFIG_KEYS = [
+    "name", "client_uuid", "fake_ip", "ipv6", "region", "cpu_model", "cpu_cores",
+    "ram_total", "ram_unit", "swap_total", "swap_unit", "disk_total", "disk_unit",
+    "os", "arch", "virtualization", "kernel_version", "gpu_name", "load_profile",
+    "cpu_min", "cpu_max", "mem_min", "mem_max", "swap_min", "swap_max",
+    "disk_min", "disk_max", "net_min", "net_max", "conn_min", "conn_max",
+    "proc_min", "proc_max", "report_interval", "traffic_reset_day",
+    "boot_time", "uptime_base", "sort_order",
+]
 
 
 def request_node_report(node_id):
@@ -51,22 +60,12 @@ def _ensure_schema_safe():
 
 
 def _cfmonitor_fingerprint(node):
-    keys = [
-        "cfmonitor_server", "cfmonitor_token", "name", "client_uuid", "fake_ip",
-        "ipv6", "region", "cpu_model", "cpu_cores", "ram_total", "ram_unit",
-        "swap_total", "swap_unit", "disk_total", "disk_unit", "load_profile",
-        "report_interval",
-    ]
+    keys = ["cfmonitor_server", "cfmonitor_token"] + REPORT_CONFIG_KEYS
     return json.dumps({k: node.get(k) for k in keys}, sort_keys=True, ensure_ascii=False)
 
 
 def _komari_fingerprint(node):
-    keys = [
-        "komari_server", "komari_token", "komari_auto_discovery", "name", "client_uuid",
-        "fake_ip", "ipv6", "region", "cpu_model", "cpu_cores", "ram_total", "ram_unit",
-        "swap_total", "swap_unit", "disk_total", "disk_unit", "load_profile", "report_interval",
-        "sort_order",
-    ]
+    keys = ["komari_server", "komari_token", "komari_auto_discovery"] + REPORT_CONFIG_KEYS
     return json.dumps({k: node.get(k) for k in keys}, sort_keys=True, ensure_ascii=False)
 
 

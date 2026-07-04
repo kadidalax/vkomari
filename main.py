@@ -17,6 +17,8 @@ from routes.nodes import (
     _reorder_nodes, _delete_node, _batch_delete, _import_nodes
 )
 
+NO_STORE_HEADERS = {"Cache-Control": "no-store"}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -197,7 +199,7 @@ if os.path.isdir("static/js"):
 
 @app.get("/")
 async def serve_root():
-    return FileResponse(os.path.join("static", "index.html"))
+    return FileResponse(os.path.join("static", "index.html"), headers=NO_STORE_HEADERS)
 
 
 @app.get("/{full_path:path}")
@@ -205,4 +207,4 @@ async def serve_spa(full_path: str):
     file_path = os.path.join("static", full_path)
     if os.path.isfile(file_path):
         return FileResponse(file_path)
-    return FileResponse(os.path.join("static", "index.html"))
+    return FileResponse(os.path.join("static", "index.html"), headers=NO_STORE_HEADERS)

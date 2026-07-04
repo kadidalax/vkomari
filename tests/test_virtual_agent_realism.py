@@ -8,6 +8,7 @@ import agent as agent_module
 from agent import VirtualAgent
 from reporters.cfmonitor import CFMonitorReporter
 from routes.nodes import _random_uptime_base
+from scheduler import _cfmonitor_fingerprint, _komari_fingerprint
 
 DAY = 86400
 
@@ -120,6 +121,24 @@ def test_cpu_changes_are_profile_specific_and_visible():
     assert low_span < mid_span < high_span
 
 
+def test_scheduler_fingerprint_tracks_load_ranges():
+    base = {
+        "id": 1,
+        "name": "range-sync",
+        "client_uuid": "uuid",
+        "load_profile": "mid",
+        "cpu_min": 10,
+        "cpu_max": 75,
+        "komari_server": "https://komari.example",
+        "komari_token": "token",
+        "cfmonitor_server": "https://cf.example",
+        "cfmonitor_token": "token",
+    }
+    changed = dict(base, cpu_min=0)
+    assert _komari_fingerprint(base) != _komari_fingerprint(changed)
+    assert _cfmonitor_fingerprint(base) != _cfmonitor_fingerprint(changed)
+
+
 def test_memory_swap_disk_keep_base_usage_and_move_slowly():
     def collect():
         a = VirtualAgent({
@@ -170,5 +189,6 @@ if __name__ == "__main__":
     test_new_nodes_randomize_uptime_between_1_and_30_days()
     test_cpu_presets_overlap_and_increase_by_profile()
     test_cpu_changes_are_profile_specific_and_visible()
+    test_scheduler_fingerprint_tracks_load_ranges()
     test_memory_swap_disk_keep_base_usage_and_move_slowly()
     test_memory_and_disk_percentages_stay_inside_configured_ranges()

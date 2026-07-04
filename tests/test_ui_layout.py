@@ -48,6 +48,15 @@ def test_load_presets_have_stable_seeded_spread():
     assert "low: { cpu_min: 0, cpu_max: 40" in data
     assert "mid: { cpu_min: 0, cpu_max: 75" in data
     assert "high: { cpu_min: 0, cpu_max: 95" in data
+    assert "this.form.cpu_min=p.cpu_min" in text
+    assert 'src="js/data.js?v=' in text
+    assert 'src="js/api.js?v=' in text
+
+
+def test_spa_entry_disables_stale_html_cache():
+    with open(os.path.join(ROOT, "main.py"), encoding="utf-8") as f:
+        main = f.read()
+    assert '"Cache-Control": "no-store"' in main
 
 
 if __name__ == "__main__":
@@ -55,3 +64,4 @@ if __name__ == "__main__":
     test_cards_use_saved_order_and_group_name_sort_buttons()
     test_default_intervals_are_komari_one_cfmonitor_three()
     test_load_presets_have_stable_seeded_spread()
+    test_spa_entry_disables_stale_html_cache()
