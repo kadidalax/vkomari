@@ -2,10 +2,26 @@
 # ponytail: stateless waves/pulses; no DB writes per sample.
 # Ported from JS agent.js
 
+import hashlib
 import math
 import time
 
 MB = 1048576
+
+CPU_PROFILES = {
+    "low": {
+        "ranges": [(0, 10, 25), (10, 25, 25), (25, 45, 25), (45, 65, 15), (65, 85, 7), (85, 100, 3)],
+        "cadence": (4, 10), "chase": 0.45, "jitter": 6,
+    },
+    "mid": {
+        "ranges": [(0, 10, 5), (10, 25, 15), (25, 45, 25), (45, 65, 25), (65, 85, 20), (85, 100, 10)],
+        "cadence": (3, 7), "chase": 0.60, "jitter": 9,
+    },
+    "high": {
+        "ranges": [(0, 10, 1), (10, 25, 3), (25, 45, 8), (45, 65, 16), (65, 85, 32), (85, 100, 40)],
+        "cadence": (2, 5), "chase": 0.75, "jitter": 12,
+    },
+}
 
 PROFILE_DEFAULTS = {
     "low": {
@@ -109,6 +125,35 @@ class VirtualAgent:
         distance = min(phase, 1 - phase)
         return self._clamp(1 - distance / max(width, 0.01), 0, 1)
 
+    def _roll(self, *parts) -> float:
+        raw = "|".join(str(p) for p in (self.identity, *parts)).encode()
+        return int.from_bytes(hashlib.blake2s(raw, digest_size=8).digest(), "big") / 0xffffffffffffffff
+
+    def _cpu_target(self, name: str, profile: dict, bucket: int) -> float:
+        roll = self._roll("cpu-target", name, bucket) * 100
+        seen = 0
+        ranges = profile["ranges"]
+        lo, hi = ranges[-1][0], ranges[-1][1]
+        for lo, hi, weight in ranges:
+            seen += weight
+            if roll <= seen:
+                break
+        return lo + (hi - lo) * self._roll("cpu-value", name, bucket)
+
+    def _cpu_value(self, t: float) -> float:
+        name = self.config.get("load_profile")
+        profile = CPU_PROFILES.get(name, CPU_PROFILES["mid"])
+        name = name if name in CPU_PROFILES else "mid"
+        lo, hi = profile["cadence"]
+        cadence = lo + (hi - lo) * self._roll("cpu-cadence")
+        bucket = math.floor(t / cadence)
+        phase = (t / cadence) - bucket
+        previous = self._cpu_target(name, profile, bucket - 1)
+        current = self._cpu_target(name, profile, bucket)
+        chase = self._clamp(phase * (1 + profile["chase"]), 0, 1)
+        jitter = (self._wave(t, 1.7, 5.3) - 0.5) * 2 * profile["jitter"]
+        return self._clamp(previous + (current - previous) * chase + jitter, 0, 100)
+
     @staticmethod
     def _clamp(value: float, mn: float, mx: float) -> float:
         return max(mn, min(mx, value))
@@ -160,15 +205,7 @@ class VirtualAgent:
             self._pulse(t, cpu_burst_p3 + self.node_seed * 3, 0.18, 8.3)
         )
 
-        cpu_rest = self._num("cpu_rest")
-        cpu_min, cpu_max = self._range("cpu_min", "cpu_max", 100)
-        cpu_var_span = max(1, cpu_max - cpu_min)
-        cpu_raw = cpu_min + cpu_var_span * self._clamp(
-            cpu_rest + active * 0.28 + burst * cpu_burst_amp * 0.72
-            + self._wave(t, 2.7, 6.1) * cpu_burst_amp * 0.08, 0, 1
-        )
-        cpu_rest_pct = self._clamp(cpu_rest * 100, 0, 100)
-        cpu = self._clamp(cpu_raw, 0, 100)
+        cpu = self._cpu_value(t)
 
         # Memory
         mem_min, mem_max = self._range("mem_min", "mem_max", 100)
@@ -247,7 +284,7 @@ class VirtualAgent:
 
         # Temperature
         cpu_thermal = self._clamp(
-            cpu_rest_pct + slow_active * 30 + self._wave(t, 120, 0.8) * cpu_max * 0.50, 0, 100
+            cpu * 0.55 + slow_active * 20 + self._wave(t, 120, 0.8) * 20, 0, 100
         )
         temp = round(34 + cpu_thermal * 0.42 + self.node_seed * 5, 1)
 
@@ -255,12 +292,12 @@ class VirtualAgent:
         cores = int(self.config.get("cpu_cores", 2))
         load1 = round(cpu / 100 * cores, 2)
         load5 = round(
-            self._clamp(cpu * 0.30 + self._wave(t, 300, 0.5) * cpu_max * 0.50
-                        + slow_active * cpu_max * 0.20, 0, 100) / 100 * cores, 2
+            self._clamp(cpu * 0.55 + self._wave(t, 300, 0.5) * 25
+                        + slow_active * 20, 0, 100) / 100 * cores, 2
         )
         load15 = round(
-            self._clamp(cpu * 0.10 + self._wave(t, 900, 1.2) * cpu_max * 0.40
-                        + slow_active * cpu_max * 0.50, 0, 100) / 100 * cores, 2
+            self._clamp(cpu * 0.35 + self._wave(t, 900, 1.2) * 25
+                        + slow_active * 30, 0, 100) / 100 * cores, 2
         )
 
         return {

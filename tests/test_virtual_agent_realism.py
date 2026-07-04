@@ -103,22 +103,35 @@ def test_new_nodes_randomize_uptime_between_1_and_30_days():
 def test_cpu_presets_overlap_and_increase_by_profile():
     assert "cpu_min REAL DEFAULT 0.0" in open("db.py", encoding="utf-8").read()
     text = open("static/js/data.js", encoding="utf-8").read()
-    values = [tuple(map(float, m)) for m in re.findall(r"(?:low|mid|high): \{ cpu_min: ([0-9.]+), cpu_max: ([0-9.]+),", text)]
-    assert values == [(0, 40), (0, 75), (0, 95)]
-    assert values[0][1] > values[1][0]
-    assert values[1][1] > values[2][0]
+    presets = re.search(r"loadPresets: \{(.*?)\n    \}", text, re.S).group(1)
+    assert "cpu_min" not in presets
+    assert "cpu_max" not in presets
 
 
 def test_cpu_changes_are_profile_specific_and_visible():
     low, mid, high = sample("low"), sample("mid"), sample("high")
-    low_span = max(low) - min(low)
-    mid_span = max(mid) - min(mid)
-    high_span = max(high) - min(high)
-    assert min(low) >= 0 and min(mid) >= 0 and min(high) >= 0
-    assert low_span >= 20
-    assert mid_span >= 40
-    assert high_span >= 55
-    assert low_span < mid_span < high_span
+    avg = lambda xs: sum(xs) / len(xs)
+    hot = lambda xs: sum(v >= 65 for v in xs) / len(xs)
+    assert all(0 <= v <= 100 for xs in [low, mid, high] for v in xs)
+    assert max(low) - min(low) >= 45
+    assert max(mid) - min(mid) >= 60
+    assert max(high) - min(high) >= 55
+    assert avg(low) < avg(mid) < avg(high)
+    assert hot(low) < hot(mid) < hot(high)
+
+
+def test_cpu_ignores_legacy_min_max_limits():
+    values = with_fixed_time(lambda: [VirtualAgent({
+        "name": "legacy-cpu-range",
+        "load_profile": "high",
+        "cpu_min": 0,
+        "cpu_max": 1,
+        "ram_total": 2048,
+        "swap_total": 512,
+        "disk_total": 20480,
+        "uptime_base": 7 * DAY,
+    }).generate_stats(i)["cpu"] for i in range(120)])
+    assert max(values) > 65
 
 
 def test_scheduler_fingerprint_tracks_load_ranges():
@@ -189,6 +202,7 @@ if __name__ == "__main__":
     test_new_nodes_randomize_uptime_between_1_and_30_days()
     test_cpu_presets_overlap_and_increase_by_profile()
     test_cpu_changes_are_profile_specific_and_visible()
+    test_cpu_ignores_legacy_min_max_limits()
     test_scheduler_fingerprint_tracks_load_ranges()
     test_memory_swap_disk_keep_base_usage_and_move_slowly()
     test_memory_and_disk_percentages_stay_inside_configured_ranges()

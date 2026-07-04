@@ -45,10 +45,15 @@ def test_load_presets_have_stable_seeded_spread():
         data = f.read()
     assert "profileSeed(key)" in text
     assert "client_uuid:crypto.randomUUID()" in text
-    assert "low: { cpu_min: 0, cpu_max: 40" in data
-    assert "mid: { cpu_min: 0, cpu_max: 75" in data
-    assert "high: { cpu_min: 0, cpu_max: 95" in data
-    assert "this.form.cpu_min=p.cpu_min" in text
+    presets = data[data.index("loadPresets: {"):data.index("// 3.", data.index("loadPresets: {"))]
+    assert "cpu_min" not in presets
+    assert "cpu_max" not in presets
+    assert "CPU最低" not in text
+    assert "CPU最高" not in text
+    assert "x-model=\"form.cpu_min\"" not in text
+    assert "x-model=\"form.cpu_max\"" not in text
+    assert "this.form.cpu_min" not in text
+    assert "this.form.cpu_max" not in text
     assert 'src="js/data.js?v=' in text
     assert 'src="js/api.js?v=' in text
 

@@ -284,8 +284,6 @@ input:checked+.toggle-bg{background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 10
       <div>
         <h3 class="text-xs font-bold text-violet-400 uppercase tracking-widest mb-3 flex items-center gap-2"><span class="w-1 h-4 bg-violet-500 rounded-full"></span>模拟波动范围</h3>
         <div class="grid grid-cols-3 gap-3">
-          <div><label class="text-[10px] text-zinc-500 uppercase">CPU最低%</label><input type="number" x-model="form.cpu_min" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
-          <div><label class="text-[10px] text-zinc-500 uppercase">CPU最高%</label><input type="number" x-model="form.cpu_max" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
           <div><label class="text-[10px] text-zinc-500 uppercase">内存最低%</label><input type="number" x-model="form.mem_min" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
           <div><label class="text-[10px] text-zinc-500 uppercase">内存最高%</label><input type="number" x-model="form.mem_max" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
           <div><label class="text-[10px] text-zinc-500 uppercase">Swap最低%</label><input type="number" x-model="form.swap_min" step="0.1" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-violet-500 focus:outline-none mt-1"></div>
@@ -570,7 +568,7 @@ function app(){return{
   async batchAction(a){try{await API.batchNodes(a);await this.loadNodes();this.notify(a==='start'?'已全部启动':'已全部停止','success')}catch(e){this.notify('操作失败: '+e.message,'error')}},
   async deleteNode(id){const ok=await this.showConfirm('删除节点','确定删除此节点？','danger','删除');if(!ok)return;try{await API.deleteNode(id);await this.loadNodes();this.notify('节点已删除','success')}catch(e){this.notify('删除失败: '+e.message,'error')}},
 
-  openModal(){this.editingTemplateId=null;this.editingTemplateName='';this.form={os:'Debian GNU/Linux 12 (bookworm)',arch:'amd64',virtualization:'kvm',region:'CN',cpu_model:'Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz',cpu_cores:1,ram_total:1,ram_unit:'GB',swap_total:512,swap_unit:'MB',disk_total:10,disk_unit:'GB',net_unit:'Bytes',load_profile:'mid',cpu_min:0,cpu_max:0,mem_min:0,mem_max:0,swap_min:0,swap_max:0,disk_min:0,disk_max:0,net_min:0,net_max:0,conn_min:0,conn_max:0,proc_min:0,proc_max:0,fake_ip:'',group_name:'',komari_server:'',komari_token:'',komari_auto_discovery:'',cfmonitor_server:'',cfmonitor_token:'',report_enabled:true,enabled:true,name:'',client_uuid:crypto.randomUUID(),report_interval:1,traffic_reset_day:1,boot_time:0,uptime_base:0,boot_date:'',kernel_version:this.getKernels('Debian GNU/Linux 12 (bookworm)')[0]};this.refreshLoad(false);this.generateIpForRegion('CN');this.parseResult='';this.installScript='';this.showModal=true},
+  openModal(){this.editingTemplateId=null;this.editingTemplateName='';this.form={os:'Debian GNU/Linux 12 (bookworm)',arch:'amd64',virtualization:'kvm',region:'CN',cpu_model:'Intel(R) Xeon(R) CPU E5-2690 v4 @ 2.60GHz',cpu_cores:1,ram_total:1,ram_unit:'GB',swap_total:512,swap_unit:'MB',disk_total:10,disk_unit:'GB',net_unit:'Bytes',load_profile:'mid',mem_min:0,mem_max:0,swap_min:0,swap_max:0,disk_min:0,disk_max:0,net_min:0,net_max:0,conn_min:0,conn_max:0,proc_min:0,proc_max:0,fake_ip:'',group_name:'',komari_server:'',komari_token:'',komari_auto_discovery:'',cfmonitor_server:'',cfmonitor_token:'',report_enabled:true,enabled:true,name:'',client_uuid:crypto.randomUUID(),report_interval:1,traffic_reset_day:1,boot_time:0,uptime_base:0,boot_date:'',kernel_version:this.getKernels('Debian GNU/Linux 12 (bookworm)')[0]};this.refreshLoad(false);this.generateIpForRegion('CN');this.parseResult='';this.installScript='';this.showModal=true},
 
   editNode(n){this.editingTemplateId=null;this.editingTemplateName='';this.form={...n,report_enabled:!!n.report_enabled,enabled:!!n.enabled};this.parseResult='';this.installScript='';this.form.kernel_version=n.kernel_version||this.getKernels(n.os)[0]||'';this.form.boot_date=n.boot_time?new Date(n.boot_time*1000).toISOString().slice(0,10):'';this.initUnits();this.showModal=true},
 
@@ -585,7 +583,6 @@ function app(){return{
     const r1=v=>Math.round(v*10)/10,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
     const pick=(a,b,k,round=r1)=>round(p[a]+(p[b]-p[a])*this.profileSeed(seed+k));
     const band=(a,b,k,round=r1)=>{const lo=Number(p[a])||0,hi=Number(p[b])||0,span=Math.max(1,hi-lo),mid=lo+span*this.profileSeed(seed+k),w=span*(.18+.22*this.profileSeed(seed+k+'w'));return [round(clamp(mid-w/2,lo,hi)),round(clamp(mid+w/2,lo,hi))]};
-    this.form.cpu_min=p.cpu_min;this.form.cpu_max=pick('cpu_min','cpu_max','cpu');
     [['mem_min','mem_max','mem'],['swap_min','swap_max','swap'],['disk_min','disk_max','disk']].forEach(([a,b,k])=>{const [lo,hi]=band(a,b,k);this.form[a]=lo;this.form[b]=hi});
     [['conn_min','conn_max','conn'],['proc_min','proc_max','proc'],['net_min','net_max','net']].forEach(([a,b,k])=>{const [lo,hi]=band(a,b,k,Math.round);this.form[a]=lo;this.form[b]=hi});
     this.form.net_unit='Bytes';
@@ -605,6 +602,7 @@ function app(){return{
       sort_order:f.sort_order||0,group_name:f.group_name||''
     };
     if(!data.name) data.name='VPS-'+Math.floor(Math.random()*1000);
+    delete data.cpu_min;delete data.cpu_max;
     try{await API.saveNode(data);this.showModal=false;await this.loadNodes();this.notify('节点已保存','success')}catch(e){this.notify('保存失败: '+e.message,'error')}
   },
 
@@ -615,7 +613,7 @@ function app(){return{
 
   async saveAsTemplate(){
     const f=this.normalizedForm();const name=this.newTemplateName||prompt('模板名称:');if(!name)return;
-    const cfg={os:f.os,arch:f.arch,virtualization:f.virtualization,region:f.region,cpu_model:f.cpu_model,gpu_name:f.gpu_name,kernel_version:f.kernel_version,cpu_cores:f.cpu_cores,ram_total:f.ram_total,swap_total:f.swap_total,disk_total:f.disk_total,load_profile:f.load_profile,cpu_min:f.cpu_min,cpu_max:f.cpu_max,mem_min:f.mem_min,mem_max:f.mem_max,swap_min:f.swap_min,swap_max:f.swap_max,disk_min:f.disk_min,disk_max:f.disk_max,net_min:f.net_min,net_max:f.net_max,conn_min:f.conn_min,conn_max:f.conn_max,proc_min:f.proc_min,proc_max:f.proc_max,report_interval:f.report_interval,traffic_reset_day:f.traffic_reset_day,report_enabled:f.report_enabled?1:0};
+    const cfg={os:f.os,arch:f.arch,virtualization:f.virtualization,region:f.region,cpu_model:f.cpu_model,gpu_name:f.gpu_name,kernel_version:f.kernel_version,cpu_cores:f.cpu_cores,ram_total:f.ram_total,swap_total:f.swap_total,disk_total:f.disk_total,load_profile:f.load_profile,mem_min:f.mem_min,mem_max:f.mem_max,swap_min:f.swap_min,swap_max:f.swap_max,disk_min:f.disk_min,disk_max:f.disk_max,net_min:f.net_min,net_max:f.net_max,conn_min:f.conn_min,conn_max:f.conn_max,proc_min:f.proc_min,proc_max:f.proc_max,report_interval:f.report_interval,traffic_reset_day:f.traffic_reset_day,report_enabled:f.report_enabled?1:0};
     try{await API.saveTemplate(name,cfg);this.newTemplateName='';await this.loadTemplates();this.notify('模板已保存','success')}catch(e){this.notify('保存失败: '+e.message,'error')}
   },
 
@@ -636,7 +634,7 @@ function app(){return{
   async saveTemplateCurrent(){
     if(!this.editingTemplateId){this.openSaveTplModal();return}
     const f=this.normalizedForm();
-    const cfg={os:f.os,arch:f.arch,virtualization:f.virtualization,region:f.region,cpu_model:f.cpu_model,gpu_name:f.gpu_name,kernel_version:f.kernel_version,cpu_cores:f.cpu_cores,ram_total:f.ram_total,swap_total:f.swap_total,disk_total:f.disk_total,load_profile:f.load_profile,cpu_min:f.cpu_min,cpu_max:f.cpu_max,mem_min:f.mem_min,mem_max:f.mem_max,swap_min:f.swap_min,swap_max:f.swap_max,disk_min:f.disk_min,disk_max:f.disk_max,net_min:f.net_min,net_max:f.net_max,conn_min:f.conn_min,conn_max:f.conn_max,proc_min:f.proc_min,proc_max:f.proc_max,report_interval:f.report_interval,traffic_reset_day:f.traffic_reset_day,report_enabled:f.report_enabled?1:0};
+    const cfg={os:f.os,arch:f.arch,virtualization:f.virtualization,region:f.region,cpu_model:f.cpu_model,gpu_name:f.gpu_name,kernel_version:f.kernel_version,cpu_cores:f.cpu_cores,ram_total:f.ram_total,swap_total:f.swap_total,disk_total:f.disk_total,load_profile:f.load_profile,mem_min:f.mem_min,mem_max:f.mem_max,swap_min:f.swap_min,swap_max:f.swap_max,disk_min:f.disk_min,disk_max:f.disk_max,net_min:f.net_min,net_max:f.net_max,conn_min:f.conn_min,conn_max:f.conn_max,proc_min:f.proc_min,proc_max:f.proc_max,report_interval:f.report_interval,traffic_reset_day:f.traffic_reset_day,report_enabled:f.report_enabled?1:0};
     try{await API.updateTemplate(this.editingTemplateId,this.editingTemplateName,cfg);await this.loadTemplates();this.notify('模板「'+this.editingTemplateName+'」已更新','success')}catch(e){this.notify('保存失败: '+e.message,'error')}
   },
 
@@ -645,7 +643,7 @@ function app(){return{
   async saveTemplateAs(){
     if(!this.saveTplName.trim()){this.notify('请输入模板名称','error');return}
     const f=this.normalizedForm();
-    const cfg={os:f.os,arch:f.arch,virtualization:f.virtualization,region:f.region,cpu_model:f.cpu_model,gpu_name:f.gpu_name,kernel_version:f.kernel_version,cpu_cores:f.cpu_cores,ram_total:f.ram_total,swap_total:f.swap_total,disk_total:f.disk_total,load_profile:f.load_profile,cpu_min:f.cpu_min,cpu_max:f.cpu_max,mem_min:f.mem_min,mem_max:f.mem_max,swap_min:f.swap_min,swap_max:f.swap_max,disk_min:f.disk_min,disk_max:f.disk_max,net_min:f.net_min,net_max:f.net_max,conn_min:f.conn_min,conn_max:f.conn_max,proc_min:f.proc_min,proc_max:f.proc_max,report_interval:f.report_interval,traffic_reset_day:f.traffic_reset_day,report_enabled:f.report_enabled?1:0};
+    const cfg={os:f.os,arch:f.arch,virtualization:f.virtualization,region:f.region,cpu_model:f.cpu_model,gpu_name:f.gpu_name,kernel_version:f.kernel_version,cpu_cores:f.cpu_cores,ram_total:f.ram_total,swap_total:f.swap_total,disk_total:f.disk_total,load_profile:f.load_profile,mem_min:f.mem_min,mem_max:f.mem_max,swap_min:f.swap_min,swap_max:f.swap_max,disk_min:f.disk_min,disk_max:f.disk_max,net_min:f.net_min,net_max:f.net_max,conn_min:f.conn_min,conn_max:f.conn_max,proc_min:f.proc_min,proc_max:f.proc_max,report_interval:f.report_interval,traffic_reset_day:f.traffic_reset_day,report_enabled:f.report_enabled?1:0};
     try{await API.saveTemplate(this.saveTplName.trim(),cfg);this.showSaveTplModal=false;await this.loadTemplates();this.notify('模板「'+this.saveTplName.trim()+'」已保存','success')}catch(e){this.notify('保存失败: '+e.message,'error')}
   },
 
