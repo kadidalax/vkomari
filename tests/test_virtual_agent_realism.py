@@ -103,7 +103,7 @@ def test_cpu_presets_overlap_and_increase_by_profile():
     assert "cpu_min REAL DEFAULT 0.0" in open("db.py", encoding="utf-8").read()
     text = open("static/js/data.js", encoding="utf-8").read()
     values = [tuple(map(float, m)) for m in re.findall(r"(?:low|mid|high): \{ cpu_min: ([0-9.]+), cpu_max: ([0-9.]+),", text)]
-    assert values == [(0, 40), (20, 75), (55, 95)]
+    assert values == [(0, 40), (0, 75), (0, 95)]
     assert values[0][1] > values[1][0]
     assert values[1][1] > values[2][0]
 

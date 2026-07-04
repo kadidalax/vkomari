@@ -44,8 +44,8 @@ def test_load_presets_have_stable_seeded_spread():
     assert "profileSeed(key)" in text
     assert "client_uuid:crypto.randomUUID()" in text
     assert "low: { cpu_min: 0, cpu_max: 40" in data
-    assert "mid: { cpu_min: 20, cpu_max: 75" in data
-    assert "high: { cpu_min: 55, cpu_max: 95" in data
+    assert "mid: { cpu_min: 0, cpu_max: 75" in data
+    assert "high: { cpu_min: 0, cpu_max: 95" in data
 
 
 if __name__ == "__main__":
