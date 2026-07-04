@@ -14,6 +14,8 @@ def test_toolbar_filter_and_footer_layout_markers():
     assert 'data-ui="top-actions"' in text
     assert 'data-ui="filter-row"' in text
     assert 'data-ui="footer-line"' in text
+    assert text.count('href="https://github.com/kadidalax/vkomari"') == 2
+    assert "github.com/kadidalax/vkomari-cf" not in text
     assert text.index('title="GitHub"') < text.index('@click="exportNodes"')
     assert text.index('x-model="activeGroup"') < text.index("@click=\"batchAction('start')\"") < text.index('@click="openModal()"')
 
