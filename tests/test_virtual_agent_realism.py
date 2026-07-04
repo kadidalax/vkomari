@@ -82,11 +82,13 @@ def test_new_nodes_randomize_uptime_between_1_and_30_days():
     assert "(f.uptime_base||0)" in html
 
 
-def test_cpu_presets_can_start_at_zero():
+def test_cpu_presets_overlap_and_increase_by_profile():
     assert "cpu_min REAL DEFAULT 0.0" in open("db.py", encoding="utf-8").read()
     text = open("static/js/data.js", encoding="utf-8").read()
-    mins = re.findall(r"(?:low|mid|high): \{ cpu_min: ([0-9.]+),", text)
-    assert mins == ["0", "0", "0"]
+    values = [tuple(map(float, m)) for m in re.findall(r"(?:low|mid|high): \{ cpu_min: ([0-9.]+), cpu_max: ([0-9.]+),", text)]
+    assert values == [(0, 40), (20, 75), (55, 95)]
+    assert values[0][1] > values[1][0]
+    assert values[1][1] > values[2][0]
 
 
 def test_cpu_changes_are_profile_specific_and_visible():
@@ -127,6 +129,6 @@ if __name__ == "__main__":
     test_cfmonitor_uses_official_total_traffic_fields()
     test_total_traffic_tracks_uptime_and_speed()
     test_new_nodes_randomize_uptime_between_1_and_30_days()
-    test_cpu_presets_can_start_at_zero()
+    test_cpu_presets_overlap_and_increase_by_profile()
     test_cpu_changes_are_profile_specific_and_visible()
     test_memory_swap_disk_keep_base_usage_and_move_slowly()

@@ -22,6 +22,7 @@ def _env_int(name: str, default: int) -> int:
 
 KOMARI_MAX_REPORTS_PER_TICK = _env_int("VKOMARI_KOMARI_MAX_RPS", 25)
 _scheduler_stop = threading.Event()
+_scheduler_wakeup = threading.Event()
 _scheduler_thread = None
 _komari_cursor = 0
 
@@ -30,6 +31,16 @@ _komari_reporters = {}   # node_id -> KomariReporter
 _komari_configs = {}     # node_id -> config fingerprint
 _cfmonitor_reporters = {} # node_id -> CFMonitorReporter
 _cfmonitor_configs = {}   # node_id -> config fingerprint
+_report_now_ids = set()
+_report_now_lock = threading.Lock()
+
+
+def request_node_report(node_id):
+    if node_id is None:
+        return
+    with _report_now_lock:
+        _report_now_ids.add(str(node_id))
+    _scheduler_wakeup.set()
 
 
 def _ensure_schema_safe():
@@ -59,18 +70,26 @@ def _komari_fingerprint(node):
     return json.dumps({k: node.get(k) for k in keys}, sort_keys=True, ensure_ascii=False)
 
 
-def _next_komari_batch(reporters):
+def _next_komari_batch(reporters, report_now_ids=None):
     global _komari_cursor
     if len(reporters) <= KOMARI_MAX_REPORTS_PER_TICK:
         return reporters
+    if report_now_ids is None:
+        with _report_now_lock:
+            report_now_ids = set(_report_now_ids)
     start = _komari_cursor % len(reporters)
     end = start + KOMARI_MAX_REPORTS_PER_TICK
     _komari_cursor = end % len(reporters)
-    return (reporters + reporters)[start:end]
+    batch = (reporters + reporters)[start:end]
+    requested = [r for r in reporters if str((getattr(r, "config", {}) or {}).get("id")) in report_now_ids and r not in batch]
+    return batch + requested
 
 
 async def _async_tick(komari_client=None):
     nodes = get_enabled_nodes()
+    with _report_now_lock:
+        report_now_ids = set(_report_now_ids)
+        _report_now_ids.clear()
 
     # Build set of current node ids
     current_komari_ids = set()
@@ -89,6 +108,8 @@ async def _async_tick(komari_client=None):
             if nid not in _komari_reporters:
                 _komari_reporters[nid] = KomariReporter(dict(node))
                 _komari_configs[nid] = fingerprint
+            if nid in report_now_ids:
+                _komari_reporters[nid].last_attempt_at = 0
             komari_reporters.append(_komari_reporters[nid])
 
         if node.get("cfmonitor_server") and node.get("cfmonitor_token"):
@@ -100,6 +121,8 @@ async def _async_tick(komari_client=None):
             if nid not in _cfmonitor_reporters:
                 _cfmonitor_reporters[nid] = CFMonitorReporter(dict(node))
                 _cfmonitor_configs[nid] = fingerprint
+            if nid in report_now_ids:
+                _cfmonitor_reporters[nid].force_next_send = True
             cf_reporters.append(_cfmonitor_reporters[nid])
 
     # Clean up stale reporters
@@ -115,7 +138,7 @@ async def _async_tick(komari_client=None):
 
     # Run all reporters concurrently, never let one crash stop others.
     # Komari reporters share one long-lived AsyncClient from the scheduler loop.
-    tasks = [r.send(komari_client) for r in _next_komari_batch(komari_reporters)] + [r.send() for r in cf_reporters]
+    tasks = [r.send(komari_client) for r in _next_komari_batch(komari_reporters, report_now_ids)] + [r.send() for r in cf_reporters]
     if tasks:
         await asyncio.gather(
             *tasks,
@@ -150,7 +173,9 @@ async def _scheduler_loop():
                 await _async_tick(komari_client)
             except Exception as e:
                 print("[vKomari] Scheduler tick error: {}".format(e))
-            await asyncio.sleep(max(0.1, TICK_SECONDS - (time.monotonic() - started)))
+            delay = max(0.1, TICK_SECONDS - (time.monotonic() - started))
+            await asyncio.to_thread(_scheduler_wakeup.wait, delay)
+            _scheduler_wakeup.clear()
 
 
 def stop_scheduler():

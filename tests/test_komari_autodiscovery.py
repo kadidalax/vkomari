@@ -88,6 +88,44 @@ def test_komari_reporter_registers_auto_discovery_before_reporting():
     assert any("report?token=registered-token" in call[0] for call in calls)
 
 
+def test_komari_reuploads_basic_info_after_interval():
+    from reporters.komari import KomariReporter
+
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+        text = "ok"
+
+        def json(self):
+            return {}
+
+    class FakeClient:
+        async def post(self, url, json=None, headers=None):
+            calls.append((url, json))
+            return FakeResponse()
+
+    reporter = KomariReporter({
+        "name": "AutoNode",
+        "komari_server": "https://komari.example.com",
+        "komari_token": "token",
+        "fake_ip": "1.2.3.4",
+        "region": "US",
+        "ram_total": 512,
+        "disk_total": 1024,
+    })
+    asyncio.run(reporter.send(FakeClient()))
+    reporter.config["fake_ip"] = "5.6.7.8"
+    reporter.config["region"] = "JP"
+    reporter.last_attempt_at = 0
+    reporter.last_basic_info_at -= reporter.basic_info_interval_sec()
+    asyncio.run(reporter.send(FakeClient()))
+
+    infos = [call[1] for call in calls if "uploadBasicInfo" in call[0]]
+    assert [info["ipv4"] for info in infos] == ["1.2.3.4", "5.6.7.8"]
+    assert infos[-1]["region"] == "🇯🇵"
+
+
 def test_komari_auto_discovery_registration_is_singleflight():
     from reporters import komari as komari_module
     from reporters.komari import KomariReporter
@@ -232,10 +270,31 @@ def test_komari_reporters_are_rate_limited_by_rotation():
         scheduler._komari_cursor = old_cursor
 
 
+def test_requested_komari_report_bypasses_rotation():
+    import scheduler
+
+    old_limit = scheduler.KOMARI_MAX_REPORTS_PER_TICK
+    old_cursor = scheduler._komari_cursor
+    try:
+        scheduler.KOMARI_MAX_REPORTS_PER_TICK = 2
+        scheduler._komari_cursor = 0
+        scheduler.request_node_report("5")
+        reporters = [type("R", (), {"config": {"id": i}})() for i in range(1, 6)]
+        batch = scheduler._next_komari_batch(reporters)
+    finally:
+        scheduler.KOMARI_MAX_REPORTS_PER_TICK = old_limit
+        scheduler._komari_cursor = old_cursor
+        scheduler._report_now_ids.clear()
+
+    assert [r.config["id"] for r in batch] == [1, 2, 5]
+
+
 if __name__ == "__main__":
     test_install_script_parses_komari_auto_discovery()
     test_komari_reporter_registers_auto_discovery_before_reporting()
+    test_komari_reuploads_basic_info_after_interval()
     test_komari_auto_discovery_registration_is_singleflight()
     test_auto_discovery_import_is_idempotent()
     test_import_nodes_are_inserted_by_name_descending()
     test_komari_reporters_are_rate_limited_by_rotation()
+    test_requested_komari_report_bypasses_rotation()

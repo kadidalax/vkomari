@@ -569,9 +569,9 @@ const DROPDOWN_DATA = {
 
     // 2. 负载预设 (从 /api/presets 迁移)
     loadPresets: {
-        low: { cpu_min: 0, cpu_max: 30, mem_min: 8, mem_max: 12, swap_min: 0, swap_max: 0, disk_min: 8, disk_max: 8.1, net_min: 10000, net_max: 200000, conn_min: 2, conn_max: 5, proc_min: 35, proc_max: 45 },
-        mid: { cpu_min: 0, cpu_max: 60, mem_min: 35, mem_max: 45, swap_min: 1, swap_max: 5, disk_min: 35, disk_max: 35.5, net_min: 102400, net_max: 1024000, conn_min: 30, conn_max: 80, proc_min: 70, proc_max: 90 },
-        high: { cpu_min: 0, cpu_max: 90, mem_min: 80, mem_max: 90, swap_min: 20, swap_max: 40, disk_min: 75, disk_max: 80, net_min: 1048576, net_max: 5242880, conn_min: 300, conn_max: 800, proc_min: 120, proc_max: 200 }
+        low: { cpu_min: 0, cpu_max: 40, mem_min: 6, mem_max: 32, swap_min: 0, swap_max: 8, disk_min: 6, disk_max: 30, net_min: 8000, net_max: 400000, conn_min: 2, conn_max: 40, proc_min: 30, proc_max: 80 },
+        mid: { cpu_min: 20, cpu_max: 75, mem_min: 25, mem_max: 68, swap_min: 0, swap_max: 18, disk_min: 24, disk_max: 65, net_min: 80000, net_max: 2097152, conn_min: 25, conn_max: 250, proc_min: 60, proc_max: 180 },
+        high: { cpu_min: 55, cpu_max: 95, mem_min: 55, mem_max: 95, swap_min: 10, swap_max: 55, disk_min: 52, disk_max: 90, net_min: 800000, net_max: 8388608, conn_min: 180, conn_max: 1000, proc_min: 140, proc_max: 360 }
     },
 
     // 3. 默认规格

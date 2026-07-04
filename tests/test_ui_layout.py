@@ -37,7 +37,19 @@ def test_default_intervals_are_komari_one_cfmonitor_three():
     assert 'TICK_SECONDS = 1' in scheduler
 
 
+def test_load_presets_have_stable_seeded_spread():
+    text = html()
+    with open(os.path.join(ROOT, "static", "js", "data.js"), encoding="utf-8") as f:
+        data = f.read()
+    assert "profileSeed(key)" in text
+    assert "client_uuid:crypto.randomUUID()" in text
+    assert "low: { cpu_min: 0, cpu_max: 40" in data
+    assert "mid: { cpu_min: 20, cpu_max: 75" in data
+    assert "high: { cpu_min: 55, cpu_max: 95" in data
+
+
 if __name__ == "__main__":
     test_toolbar_filter_and_footer_layout_markers()
     test_cards_use_saved_order_and_group_name_sort_buttons()
     test_default_intervals_are_komari_one_cfmonitor_three()
+    test_load_presets_have_stable_seeded_spread()

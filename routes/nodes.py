@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
 from auth import auth_required
 from db import get_db, get_nodes, save_node, normalize_node_data, NODE_FIELDS
+from scheduler import request_node_report
 
 router = APIRouter()
 
@@ -53,7 +54,9 @@ async def _create_node(request: Request):
         d["report_interval"] = _default_report_interval(d)
     if not d.get("uptime_base"):
         d["uptime_base"] = _random_uptime_base()
-    return save_node(d)
+    result = save_node(d)
+    request_node_report(d.get("id") or result.get("id"))
+    return result
 
 
 async def _toggle_node(request: Request):

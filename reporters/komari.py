@@ -7,6 +7,8 @@ from urllib.parse import quote
 from agent import VirtualAgent
 from db import get_db
 
+BASIC_INFO_INTERVAL_SEC = 300
+
 
 def country_flag(region: str) -> str:
     raw = str(region or "").strip()
@@ -31,6 +33,7 @@ class KomariReporter:
         self.agent = VirtualAgent(config)
         self.tick_count = 0
         self.info_sent = False
+        self.last_basic_info_at = 0
         self.last_attempt_at = 0
         self.last_send_log_at = 0
         self.fail_count = 0
@@ -60,6 +63,9 @@ class KomariReporter:
         if self.fail_count:
             return min(60, max(base, 2 ** min(self.fail_count, 5)))
         return base
+
+    def basic_info_interval_sec(self) -> int:
+        return BASIC_INFO_INTERVAL_SEC
 
     async def ensure_token(self, client=None) -> bool:
         if self.config.get("komari_token"):
@@ -156,6 +162,7 @@ class KomariReporter:
                 json=info,
             )
             self.info_sent = True
+            self.last_basic_info_at = time.time()
             self.fail_count = 0
         except Exception as e:
             self.fail_count += 1
@@ -213,7 +220,7 @@ class KomariReporter:
         self.last_attempt_at = now
         if not await self.ensure_token(client):
             return
-        if not self.info_sent:
+        if not self.info_sent or now - self.last_basic_info_at >= self.basic_info_interval_sec():
             await self.upload_basic_info(client)
         try:
             await self._post(client, self.report_url, json=self.build_report())
